@@ -1,17 +1,28 @@
-# OpenGym EvoluPersonal
+# OpenGym EvoluPersonal · Alpha 0.21
 
-Repositório de distribuição do fork limpo do OpenGym com os módulos EvoluPersonal. O código-fonte base está em `Fork-OpenGym.bundle`; o patch cumulativo contém as alterações da integração e da fase 3.
+Aplicativo web instalável para personal trainer: alunos, rotinas, sessões, avaliações, agenda, anamnese, acompanhamentos e relatórios.
 
-## Preparar o código
+## Arquivos do PWA
 
-Baixe `Fork-OpenGym.bundle` e `Fork-OpenGym-Fase2-3.patch` desta página e deixe os dois arquivos na mesma pasta. No terminal:
+Os arquivos estão separados na raiz para implantação estática:
 
-```sh
-git clone Fork-OpenGym.bundle OpenGym-EvoluPersonal
-git -C OpenGym-EvoluPersonal apply ../Fork-OpenGym-Fase2-3.patch
-cd OpenGym-EvoluPersonal/frontend
-npm install
-npm run dev
-```
+- `index.html`: interface e lógica do aplicativo.
+- `manifest.webmanifest`: identidade, ícones e instalação.
+- `sw.js`: cache do aplicativo, mídia offline e atualização.
+- `offline-assets.json`: catálogo de mídias para baixar.
+- `icons/`: ícones de instalação.
+- `training-methods.js`, `insights.js`, `programs.js`: módulos auxiliares.
+- `OFFLINE_CREDITS.md`: atribuições.
+- `vercel.json`: cabeçalhos PWA e encaminhamento das mídias.
 
-O patch cumulativo foi validado contra a revisão base contida no bundle. Para gerar a versão de produção, execute `npm run build` dentro de `frontend`.
+Os GIFs e imagens ficam no repositório EvoluPersonal e são servidos pelo Vercel por uma regra em `vercel.json`, fixada na revisão de origem b224519ac23473e0e13f4f74e29b6e70e1ce6f01. Assim, este repositório mantém o app separado da biblioteca de mídia, e o service worker pode guardar a biblioteca no dispositivo após o download offline.
+
+## Publicar no Vercel
+
+Importe este repositório. Use a raiz do projeto, framework **Other**, sem comando de build e com a saída na raiz. O app precisa ser publicado por HTTPS para permitir instalação e uso offline.
+
+Na primeira abertura, conecte-se à internet. Depois, em **Biblioteca**, toque em **Baixar biblioteca offline** e aguarde o término do download. Os dados dos alunos ficam no navegador deste dispositivo; exporte backups regularmente.
+
+## Arquivos históricos
+
+`Fork-OpenGym-Fase2-3.patch` e o bundle de origem são mantidos para consulta do fluxo anterior do fork. Eles não são necessários para a implantação estática do PWA.
