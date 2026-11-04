@@ -1,6 +1,6 @@
 # Créditos do pacote offline
 
-O EvoluPersonal inclui 24 imagens de referência do OpenExerciseBase, mantido pelo Ludwig Boltzmann Institute for Digital Health and Prevention.
+O catálogo associa 25 exercícios a imagens de referência do OpenExerciseBase, mantido pelo Ludwig Boltzmann Institute for Digital Health and Prevention. São 24 arquivos de imagem distintos.
 
 Atribuição: OpenExerciseBase — Ludwig Boltzmann Institute for Digital Health and Prevention.  
 Licença: CC BY-NC 4.0 — https://creativecommons.org/licenses/by-nc/4.0/  
