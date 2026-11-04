@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_NAME = 'evolupersonal-md500-offline-v3';
-// Atualização do shell 2026-11-04; mantém v3 para preservar a mídia já baixada offline.
+// Beta 1.1 — correções de backup, PDF e acompanhamento; mantém v3 para preservar a mídia já baixada offline.
 const SCOPE_URL = self.registration.scope;
 const SHELL = ['./index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './training-methods.js', './insights.js', './programs.js', './offline-assets.json', './OFFLINE_CREDITS.md'];
 const ALLOWED_MEDIA_HOSTS = new Set(['gellyfish-ai.github.io', 'raw.githubusercontent.com']);
@@ -93,7 +93,8 @@ self.addEventListener('message', event => {
     const cache = await caches.open(CACHE_NAME);
     let manifest;
     try {
-      const response = await fetch(new URL('./offline-assets.json', SCOPE_URL));
+      const manifestURL = new URL('./offline-assets.json', SCOPE_URL);
+      const response = await fetch(manifestURL).catch(() => cache.match(manifestURL));
       if (!response.ok) throw new Error('Não foi possível obter a lista de mídias.');
       manifest = await response.json();
     } catch (error) {
@@ -108,6 +109,7 @@ self.addEventListener('message', event => {
     const total = localAssets.length + externalURLs.length;
     let complete = 0;
     const failed = [];
+    let unverified = 0;
     port.postMessage({ type: 'PROGRESS', total, complete, failed: 0, bytes: manifest.bytes || 0 });
 
     for (let offset = 0; offset < localAssets.length; offset += 3) {
@@ -137,6 +139,7 @@ self.addEventListener('message', event => {
           if (!await cache.match(key)) {
             const response = await fetch(key);
             if (!response.ok && response.type !== 'opaque') throw new Error('HTTP ' + response.status);
+            if(response.type === 'opaque') unverified++;
             await cache.put(key, response);
           }
         } catch (error) {
@@ -155,9 +158,11 @@ self.addEventListener('message', event => {
       externalTotal: externalURLs.length,
       complete,
       failedCount: failed.length,
+      unverified,
       failed: failed.slice(0, 30),
       bytes: manifest.bytes || 0
     });
   })());
 });
+
 
