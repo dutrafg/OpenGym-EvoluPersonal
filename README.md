@@ -15,7 +15,7 @@ Os arquivos estão separados na raiz para implantação estática:
 - `OFFLINE_CREDITS.md`: atribuições.
 - `vercel.json`: cabeçalhos PWA e encaminhamento das mídias.
 
-Os GIFs e imagens ficam no repositório EvoluPersonal e são servidos pelo Vercel por uma regra em `vercel.json`, fixada na revisão de origem b224519ac23473e0e13f4f74e29b6e70e1ce6f01. Assim, este repositório mantém o app separado da biblioteca de mídia, e o service worker pode guardar a biblioteca no dispositivo após o download offline.
+Os GIFs e imagens ficam no repositório EvoluPersonal e são referenciados pela revisão de origem `b224519ac23473e0e13f4f74e29b6e70e1ce6f01`. O service worker os baixa diretamente para o cache offline. Assim, este repositório mantém o app separado da biblioteca de mídia, sem depender de uma pasta local `assets/` no Vercel.
 
 ## Publicar no Vercel
 

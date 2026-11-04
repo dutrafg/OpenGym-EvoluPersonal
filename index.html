@@ -857,7 +857,7 @@ async function downloadOfflineLibrary(){
     if(status)status.textContent='Baixando mídias para uso offline: '+data.complete+' de '+data.total+(data.failed?' · falhas: '+data.failed:'')+'. Mantenha esta página aberta.';
    }else if(data.type==='DONE'){
     button.disabled=false;button.textContent=data.failedCount?'Tentar novamente · '+data.failedCount+' falhas':'Atualizar biblioteca offline';
-    if(status)status.textContent=data.failedCount?'Download parcial: '+(data.total-data.failedCount)+' de '+data.total+' arquivos salvos. Verifique a conexão e tente novamente.':'Biblioteca disponível offline: 500 exercícios, '+data.localTotal+' arquivos locais e '+data.externalTotal+' imagens de comparação salvos neste navegador.';
+    if(status)status.textContent=data.failedCount?'Download parcial: '+(data.total-data.failedCount)+' de '+data.total+' arquivos salvos. Verifique a conexão e tente novamente.':'Biblioteca disponível offline: 500 exercícios, '+data.complete+' arquivos de mídia salvos neste navegador, incluindo o acervo principal e as fontes de comparação.';
     channel.port1.close();
    }else if(data.type==='ERROR'){
     button.disabled=false;button.textContent=initialLabel;
@@ -874,7 +874,7 @@ async function downloadOfflineLibrary(){
  }
 }
 function safeURL(s){try{let u=new URL(s);return ['https:','http:'].includes(u.protocol)?u.href:null}catch(e){return null}}
-function offlineMediaURL(src){if(!/^https:\/\//i.test(src||'')||!navigator.serviceWorker?.controller)return src;try{const u=new URL(src);if(!['gellyfish-ai.github.io','raw.githubusercontent.com'].includes(u.hostname))return src;return'./__offline-media?src='+encodeURIComponent(u.href)}catch(e){return src}}
+function offlineMediaURL(src){if(typeof src==='string'&&src.startsWith('./assets/'))src='https://raw.githubusercontent.com/dutrafg/EvoluPersonal/b224519ac23473e0e13f4f74e29b6e70e1ce6f01/dist/'+src.slice(2);if(!/^https:\/\//i.test(src||'')||!navigator.serviceWorker?.controller)return src;try{const u=new URL(src);if(!['gellyfish-ai.github.io','raw.githubusercontent.com'].includes(u.hostname))return src;return'./__offline-media?src='+encodeURIComponent(u.href)}catch(e){return src}}
 function animationDisplayURL(e){const src=mdMediaSource(e),url=src==='./assets/exercises/e4.gif'?src+'?v=fix-single-frame-20261029':src;return offlineMediaURL(url)}
 function exerciseArt(e){const src=animationDisplayURL(e);return '<div class="libraryicon"'+(src?'':' aria-label="Animação ainda não disponível"')+'>'+(src?'<img src="'+esc(src)+'" alt="Animação do exercício '+esc(e.name)+'" loading="lazy" onerror="this.hidden=true;this.parentNode.setAttribute(\'aria-label\',\'Não foi possível carregar o GIF\')">':'<div class="no-motion">GIF ainda não cadastrado para este exercício</div>')+'</div>'}
 

@@ -20,7 +20,7 @@ async function cachedExternalResponse(value) {
   if (!url) return new Response('Fonte externa não permitida.', { status: 400 });
   const cache = await caches.open(CACHE_NAME);
   const key = new Request(url, { mode: 'no-cors' });
-  const cached = await cache.match(key);
+  const cached = await cache.match(key, { ignoreSearch: true });
   if (cached) return cached;
   try {
     const response = await fetch(key);
@@ -101,14 +101,16 @@ self.addEventListener('message', event => {
     }
 
     const assets = manifest.assets || [];
-    const externalURLs = [...new Set((event.data.urls || []).map(safeExternalURL).filter(Boolean))];
-    const total = assets.length + externalURLs.length;
+    const localAssets = assets.filter(path => !/^https:\/\//i.test(path));
+    const declaredExternal = assets.filter(path => /^https:\/\//i.test(path)).map(safeExternalURL).filter(Boolean);
+    const externalURLs = [...new Set([...declaredExternal, ...(event.data.urls || []).map(safeExternalURL).filter(Boolean)])];
+    const total = localAssets.length + externalURLs.length;
     let complete = 0;
     const failed = [];
     port.postMessage({ type: 'PROGRESS', total, complete, failed: 0, bytes: manifest.bytes || 0 });
 
-    for (let offset = 0; offset < assets.length; offset += 3) {
-      const batch = assets.slice(offset, offset + 3);
+    for (let offset = 0; offset < localAssets.length; offset += 3) {
+      const batch = localAssets.slice(offset, offset + 3);
       await Promise.all(batch.map(async path => {
         const url = new URL(path, SCOPE_URL).href;
         try {
@@ -148,7 +150,7 @@ self.addEventListener('message', event => {
     port.postMessage({
       type: 'DONE',
       total,
-      localTotal: assets.length,
+      localTotal: localAssets.length,
       externalTotal: externalURLs.length,
       complete,
       failedCount: failed.length,
