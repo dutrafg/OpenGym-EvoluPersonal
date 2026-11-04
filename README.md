@@ -4,7 +4,7 @@ Repositório de distribuição do fork limpo do OpenGym com os módulos EvoluPer
 
 ## Preparar o código
 
-Baixe `Fork-OpenGym.bundle` e `Fork-OpenGym-Fase2-3.patch) desta página e deixe os dois arquivos na mesma pasta. No terminal:
+Baixe `Fork-OpenGym.bundle` e `Fork-OpenGym-Fase2-3.patch` desta página e deixe os dois arquivos na mesma pasta. No terminal:
 
 ```sh
 git clone Fork-OpenGym.bundle OpenGym-EvoluPersonal
