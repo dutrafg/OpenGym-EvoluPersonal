@@ -25,4 +25,4 @@ Na primeira abertura, conecte-se à internet. Depois, em **Biblioteca**, toque e
 
 ## Arquivos históricos
 
-`Fork-OpenGym-Fase2-3.patch` e o bundle de origem são mantidos para consulta do fluxo anterior do fork. Eles não são necessários para a implantação estática do PWA.
+`Fork-OpenGym-Fase2-3.patch` permanece como registro do trabalho anterior. O bundle de origem citado nas instruções antigas não está na `main`; nenhum dos dois arquivos é necessário para implantar o PWA estático.
