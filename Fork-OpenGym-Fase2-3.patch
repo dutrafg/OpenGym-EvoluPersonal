@@ -1,23 +1,5 @@
-From 834c92b954092ab205f5fb5af133665b30cbea5d Mon Sep 17 00:00:00 2001
-From: Codex <codex@openai.com>
-Date: Wed, 4 Nov 2026 07:10:00 -0300
-Subject: [PATCH] Complete student routines and reassessment dashboard
-
----
- README.md                                 |   2 +-
- frontend/src/lib/routines.js              |  11 +
- frontend/src/lib/routines.replace.test.js |  27 +-
- frontend/src/lib/routines.update.test.js  |   8 +-
- frontend/src/sheets.jsx                   |   9 +-
- frontend/src/views/Home.jsx               |   6 +-
- frontend/src/views/PersonalWorkspace.jsx  | 325 ++++++++++++++++++----
- frontend/src/views/Plan.jsx               |  26 +-
- frontend/src/views/RoutineEdit.jsx        |   7 +-
- frontend/src/views/Workout.jsx            |   6 +-
- 10 files changed, 335 insertions(+), 92 deletions(-)
-
 diff --git a/README.md b/README.md
-index 489c761..67baaca 100644
+index 489c7619e3bc7973bd16f29d1d500104bd8ed859..1de0e8bfb73aa10f8235119bcec9075750647bb8 100644
 --- a/README.md
 +++ b/README.md
 @@ -2,7 +2,7 @@
@@ -25,12 +7,103 @@ index 489c761..67baaca 100644
  EvoluPersonal is an independent training tracker based on the permitted openGym application code. This clean fork contains no upstream Git history or exercise-library records, name/instruction packs, exercise images, animations, or their download packs.
  
 -The exercise library contains 500 Portuguese records migrated from the owner's EvoluPersonal project and 149 newly created 3D GIFs from that project. The 296 legacy GIFs were not migrated because their origin has not been fully audited. The personal-trainer workspace adds student records and assigns routines built with the existing OpenGym plan editor.
-+The exercise library contains 500 Portuguese records migrated from the owner's EvoluPersonal project and 149 newly created 3D GIFs from that project. The 296 legacy GIFs were not migrated because their origin has not been fully audited. The personal-trainer workspace adds student records, independent editable routine copies per student, session and measurement tracking, and dashboard follow-up for upcoming reassessments. Student routines stay separate from the user's personal plan.
++The exercise library contains 500 Portuguese records migrated from the owner's EvoluPersonal project and 149 newly created 3D GIFs from that project. The 296 legacy GIFs were not migrated because their origin has not been fully audited. The personal-trainer workspace adds student records, independent editable routine copies per student, session and measurement tracking, reassessment dates, and dashboard follow-up for inactivity. Profiles show recent session frequency, perceived effort, and measurement trends. Student routines stay separate from the user's personal plan.
  
  ## License and attribution
  
+diff --git a/frontend/index.html b/frontend/index.html
+index c0a8b62b2fb8ed16bbeca1a5194363963c74b39b..f37f002c3c1c2a38e8e0a284eed1f90124be226a 100644
+--- a/frontend/index.html
++++ b/frontend/index.html
+@@ -47,27 +47,27 @@
+     }
+     window.addEventListener('error', function (e) {
+       var t = e && e.target;
+-      if (t && t.tagName === 'SCRIPT') return fail('EvoluPersonal could not start on this browser.', 'Could not load ' + (t.src || 'a script'));
++      if (t && t.tagName === 'SCRIPT') return fail('OpenGym could not start on this browser.', 'Could not load ' + (t.src || 'a script'));
+       if (!e || !e.message) return;
+       last = e.message + (e.filename ? ' at ' + e.filename.split('/').pop() + ':' + e.lineno : '');
+-      if (/SyntaxError|Unexpected|Invalid regular expression/i.test(e.message)) fail('EvoluPersonal could not start on this browser.', last);
++      if (/SyntaxError|Unexpected|Invalid regular expression/i.test(e.message)) fail('OpenGym could not start on this browser.', last);
+     }, true);
+     window.addEventListener('unhandledrejection', function (e) {
+       var r = e && e.reason;
+       if (r) last = String((r && r.message) || r);
+     });
+     setTimeout(function () {
+-      fail(last ? 'EvoluPersonal could not start on this browser.' : 'EvoluPersonal is taking too long to start.', last);
++      fail(last ? 'OpenGym could not start on this browser.' : 'OpenGym is taking too long to start.', last);
+     }, 10000);
+   })();
+ </script>
+-<title>EvoluPersonal</title>
++<title>OpenGym</title>
+ <meta name="description" content="Planeje seus treinos, registre sua evolução e organize seus próprios exercícios.">
+ <meta name="theme-color" content="#0c0e12">
+ <meta name="apple-mobile-web-app-capable" content="yes">
+ <meta name="mobile-web-app-capable" content="yes">
+ <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+-<meta name="apple-mobile-web-app-title" content="EvoluPersonal">
++<meta name="apple-mobile-web-app-title" content="OpenGym">
+ <!-- use-credentials: browsers fetch the manifest without cookies, even same-origin; behind an auth
+      proxy (Authelia, Cloudflare Access, Teleport…) that fetch is a login redirect and the Home Screen
+      icon comes out generic. iOS 26 reads the icon from the manifest, so this is where it shows. -->
+diff --git a/frontend/public/manifest.json b/frontend/public/manifest.json
+index 4ef5d0701e26a3b52db41f990153a5dd26958950..a15ec31b822265582de0e8541c60ca0832ae10b0 100644
+--- a/frontend/public/manifest.json
++++ b/frontend/public/manifest.json
+@@ -1,13 +1,14 @@
+ {
+-  "name": "EvoluPersonal",
+-  "short_name": "EvoluPersonal",
+-  "description": "Aplicativo pessoal para planejar treinos e acompanhar a evolução.",
+-  "start_url": "./",
++  "name": "OpenGym",
++  "short_name": "OpenGym",
++  "id": "./",
++  "description": "Treinos, exercícios e acompanhamento de alunos.",
++  "start_url": "./#/home",
+   "scope": "./",
+   "display": "standalone",
+-  "orientation": "portrait",
+   "background_color": "#0c0e12",
+   "theme_color": "#0c0e12",
++  "categories": ["fitness", "health"],
+   "icons": [
+     {
+       "src": "icon-180.png",
+@@ -22,5 +23,28 @@
+       "purpose": "any maskable"
+     }
+   ],
+-  "lang": "pt-BR"
++  "lang": "pt-BR",
++  "shortcuts": [
++    {
++      "name": "Área do personal",
++      "short_name": "Alunos",
++      "description": "Acompanhe alunos e sessões de treino.",
++      "url": "./#/personal",
++      "icons": [{ "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }]
++    },
++    {
++      "name": "Planejar treino",
++      "short_name": "Treino",
++      "description": "Crie e edite rotinas de treino.",
++      "url": "./#/plan",
++      "icons": [{ "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }]
++    },
++    {
++      "name": "Biblioteca de exercícios",
++      "short_name": "Exercícios",
++      "description": "Pesquise e cadastre exercícios próprios.",
++      "url": "./#/library",
++      "icons": [{ "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }]
++    }
++  ]
+ }
 diff --git a/frontend/src/lib/routines.js b/frontend/src/lib/routines.js
-index f826569..9c3a17d 100644
+index f82656954952eb5fe600a272c9d4e72f3234846c..9c3a17d90e8dcb059e00a889e751533e734b100d 100644
 --- a/frontend/src/lib/routines.js
 +++ b/frontend/src/lib/routines.js
 @@ -7,6 +7,12 @@ import { ownExerciseRest } from './supersetFlow.js'
@@ -59,7 +132,7 @@ index f826569..9c3a17d 100644
    const esc = suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
    const m = new RegExp('^(.*) \\(' + esc + '(?: (\\d+))?\\)$').exec(routine.name || '')
 diff --git a/frontend/src/lib/routines.replace.test.js b/frontend/src/lib/routines.replace.test.js
-index 788725b..b13510d 100644
+index 788725b377dd22cb7660c7bae48b45b8d16abffe..b13510d7a0f91cd74779879b3088d4f8b1d83cff 100644
 --- a/frontend/src/lib/routines.replace.test.js
 +++ b/frontend/src/lib/routines.replace.test.js
 @@ -6,14 +6,21 @@ import { buildCombinedEntries } from './session-merge.js'
@@ -104,7 +177,7 @@ index 788725b..b13510d 100644
  })
  
 diff --git a/frontend/src/lib/routines.update.test.js b/frontend/src/lib/routines.update.test.js
-index 59c6be2..847ccb5 100644
+index 59c6be2430116fbc95b8f7733689b0d88f23a111..847ccb51df8ad5cba3dba5e9228b891cb8e9f6d9 100644
 --- a/frontend/src/lib/routines.update.test.js
 +++ b/frontend/src/lib/routines.update.test.js
 @@ -3,10 +3,12 @@
@@ -123,8 +196,76 @@ index 59c6be2..847ccb5 100644
  
  const work = n => Array.from({ length: n }, () => ({ w: 60, r: 5, done: false }))
  const warm = n => Array.from({ length: n }, () => ({ w: 30, r: 5, done: false, phase: 'warmup' }))
+diff --git a/frontend/src/lib/sync-changes.js b/frontend/src/lib/sync-changes.js
+index 2fcfa07260aa5b39dab8dc320f267967efbcd736..af77375ec7f86cdea734c196b6a067ba8300cc41 100644
+--- a/frontend/src/lib/sync-changes.js
++++ b/frontend/src/lib/sync-changes.js
+@@ -28,6 +28,7 @@ const LISTS = {
+   c: ['customEx', e => e?.id],
+   s: ['coachStudents', e => e?.id],
+   q: ['coachSessions', e => e?.id],
++  m: ['coachMeasurements', e => e?.id],
+ }
+ // Not content: the stamps and the revision say when, not what (`deleted` and `edited` go with a
+ // change the lists or the rest already count); the running workout never syncs.
+diff --git a/frontend/src/lib/sync-merge.js b/frontend/src/lib/sync-merge.js
+index d7ec18f5449a21c0407036a99a07f48c9e574a74..07a843201f7e7287bae520d582cdf517bd6885bf 100644
+--- a/frontend/src/lib/sync-merge.js
++++ b/frontend/src/lib/sync-merge.js
+@@ -494,7 +494,7 @@ const workoutTime = w => Number(w?._ts) || Number(w?.end) || Number(w?.start) ||
+ const bodyweightKey = e => `${e?.d}|${e?.t ?? ''}`
+ const RESET_LISTS = {
+   workouts: workoutKey, routines: x => x?.id, customEx: x => x?.id, bodyweight: bodyweightKey,
+-  measurements: bodyweightKey, gymCards: x => x?.id, equipProfiles: x => x?.id, coachStudents: x => x?.id, coachSessions: x => x?.id, favEx: x => x,
++  measurements: bodyweightKey, gymCards: x => x?.id, equipProfiles: x => x?.id, coachStudents: x => x?.id, coachSessions: x => x?.id, coachMeasurements: x => x?.id, favEx: x => x,
+ }
+ const RESET_MAPS = ['exNotes', 'barWeights', 'exAliases', 'programmes', ...STAMPED_MAPS]
+ /** An entry's name in resetIds: a workout's id (or day and start), a weigh-in's day and time, … */
+@@ -600,7 +600,7 @@ export function sinceReset(S, at, ids) {
+ // removal (the entry's own `_ts`, a weigh-in's `t`) keeps it, as does an add-back stamped later.
+ const DEL_LISTS = {
+   workouts: workoutKey, routines: x => x?.id, customEx: x => x?.id, bodyweight: e => e?.d,
+-  measurements: e => e?.d, gymCards: x => x?.id, equipProfiles: x => x?.id, coachStudents: x => x?.id, coachSessions: x => x?.id, favEx: x => x,
++  measurements: e => e?.d, gymCards: x => x?.id, equipProfiles: x => x?.id, coachStudents: x => x?.id, coachSessions: x => x?.id, coachMeasurements: x => x?.id, favEx: x => x,
+ }
+ // When an entry was last edited, to hold against a removal. Entries with no time of their own
+ // (favourites, and cards and profiles saved before they were stamped) count as older than any
+@@ -611,6 +611,7 @@ const DEL_TIME = {
+   gymCards: x => Number(x?._ts) || 0, equipProfiles: x => Number(x?._ts) || 0,
+   coachStudents: x => Number(x?._ts) || 0,
+   coachSessions: x => Number(x?._ts) || 0,
++  coachMeasurements: x => Number(x?._ts) || 0,
+ }
+ // Per field, the most stamps kept; past it the oldest go first.
+ export const DELETED_MAX = 5000
+@@ -716,7 +717,7 @@ function applyDeletions(S, deleted) {
+ // merge of their own are not stamped here; a field nobody stamped follows the newer copy, as before.
+ const OWN_MERGE = new Set([
+   '_ts', '_rev', '_wid', '_wids', '_unstamped', '_prior', 'active', 'unit', 'unitSet', 'resetAt', 'resetIds', 'deleted', 'edited', 'undone', 'routineOrder',
+-  'workouts', 'routines', 'customEx', 'equipProfiles', 'gymCards', 'coachStudents', 'coachSessions', 'bodyweight', 'measurements', 'favEx',
++  'workouts', 'routines', 'customEx', 'equipProfiles', 'gymCards', 'coachStudents', 'coachSessions', 'coachMeasurements', 'bodyweight', 'measurements', 'favEx',
+   'exWeights', 'balanceOverrides', 'loadKind', 'plates', 'dbLoad', 'dumbbells', 'stackWeights', 'exUnit', 'dayNotes', 'dayPhotos', 'exMerged',
+ ])
+ // Stamped per key instead of whole: one day of the plan, one exercise's note or bar, one programme
+@@ -898,7 +899,7 @@ export function mergeStates(a0, b0, { prefer } = {}) {
+     }
+   }
+   out.workouts.sort(byDayStart)
+-  for (const f of ['routines', 'customEx', 'equipProfiles', 'gymCards', 'coachStudents', 'coachSessions']) {
++  for (const f of ['routines', 'customEx', 'equipProfiles', 'gymCards', 'coachStudents', 'coachSessions', 'coachMeasurements']) {
+     if (list(n[f]).length || list(o[f]).length) out[f] = (f === 'routines' ? unionByNeighbours : unionById)(n[f], o[f]).map(clone)
+     if ((f === 'coachStudents' || f === 'coachSessions') && !prefer) {
+       const aBy = new Map(list(n[f]).map(x => [x?.id, x]))
+@@ -1209,6 +1210,7 @@ export function stampChange(prev, next, wall = Date.now()) {
+   stampEntries(prev?.gymCards, next.gymCards, now)
+   stampEntries(prev?.coachStudents, next.coachStudents, now)
+   stampEntries(prev?.coachSessions, next.coachSessions, now)
++  stampEntries(prev?.coachMeasurements, next.coachMeasurements, now)
+   stampDeletions(prev, next, now)
+   stampEdits(prev, next, now)
+   return now
 diff --git a/frontend/src/sheets.jsx b/frontend/src/sheets.jsx
-index c2a7c13..582ce25 100644
+index c2a7c1370419163b3213240ae76c7e3051ce43d0..582ce2560d0d9eae5fd69de53247b61ecfcb032a 100644
 --- a/frontend/src/sheets.jsx
 +++ b/frontend/src/sheets.jsx
 @@ -66,6 +66,7 @@ import { speedUnitOf, toSpeed, fromSpeed } from './lib/speed.js'
@@ -171,8 +312,21 @@ index c2a7c13..582ce25 100644
          const already = inSession.has(r.id)
          const empty = !(r.ex || []).length
          const disabled = already || empty
+diff --git a/frontend/src/store/useStore.js b/frontend/src/store/useStore.js
+index ca09ebddbfbe684a9162205de8025b7997f4c2c7..03510d548625718d132468a55c983df8e471bb21 100644
+--- a/frontend/src/store/useStore.js
++++ b/frontend/src/store/useStore.js
+@@ -115,7 +115,7 @@ export const DEF = {
+   programmes: {}, programme: null,
+   exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',
+   // Coach workspace: private student records and links to the owner's reusable routines.
+-  coachStudents: [], coachSessions: [],
++  coachStudents: [], coachSessions: [], coachMeasurements: [],
+   // Stats activity heatmap metric. Profiles without this key continue to open on time.
+   heatmapMetric: 'time',
+   // Settings → Units → "Count warm-ups in volume" (#719): off keeps volume to work sets.
 diff --git a/frontend/src/views/Home.jsx b/frontend/src/views/Home.jsx
-index f659dc8..a64a33e 100644
+index bb4700ce0a5c6ada5b607aff6a562b03acfecf5b..a64a33ebff7e7eacdc7db91c20b22d43bd6b0abb 100644
 --- a/frontend/src/views/Home.jsx
 +++ b/frontend/src/views/Home.jsx
 @@ -30,11 +30,13 @@ import { WrappedHomeCard } from '../components/WrappedEntry.jsx'
@@ -189,6 +343,15 @@ index f659dc8..a64a33e 100644
    const user = useStore(s => s.user)
    // The banner switched off and the sync stuck: a dot on the gear (Settings → Show connection status).
    const trouble = useConnectionTrouble()
+@@ -126,7 +128,7 @@ export default function Home() {
+   return <div className="narrow">
+     <div className="hdr">
+       <SeasonDeco spot="header-bats" />
+-      <div><h1>{user ? t('Hi {0}', user.name) : 'EvoluPersonal'}</h1><div className="sub">{today.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
++      <div><h1>{user ? t('Hi {0}', user.name) : 'OpenGym'}</h1><div className="sub">{today.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
+       <button className="iconbtn" data-tour="settings-gear" onClick={() => nav('/settings')} aria-label={trouble ? t('Settings') + ', ' + t('Connection problem') : t('Settings')}><Icon name="gear" />{trouble && <span className="tab-dot" aria-hidden="true" />}</button>
+     </div>
+ 
 @@ -217,11 +219,11 @@ export default function Home() {
  
      <div className="card tap-host">
@@ -204,10 +367,10 @@ index f659dc8..a64a33e 100644
          <CardHead icon="calendar" title={t('Welcome!')} sub={t('Set up your weekly routine to get going, or grab a ready-made starter plan.')} />
          <Button variant="primary" icon="clipboard" onClick={starterPlanSheet}>{t('Load starter plan')}</Button>
 diff --git a/frontend/src/views/PersonalWorkspace.jsx b/frontend/src/views/PersonalWorkspace.jsx
-index 8900d2a..dc2d987 100644
+index 801ad634ff6d5b7f3ed300a7378b28dcee2f4227..45bea9762995fccd4749893d9a7f3774e0bea6b5 100644
 --- a/frontend/src/views/PersonalWorkspace.jsx
 +++ b/frontend/src/views/PersonalWorkspace.jsx
-@@ -1,42 +1,164 @@
+@@ -1,40 +1,201 @@
 -import { useState } from 'react'
 +import { useEffect, useState } from 'react'
  import { useNavigate } from 'react-router-dom'
@@ -218,8 +381,9 @@ index 8900d2a..dc2d987 100644
  import Icon from '../components/Icon.jsx'
  import CardHead from '../components/CardHead.jsx'
  import EmptyState from '../components/EmptyState.jsx'
++import LineChart from '../components/LineChart.jsx'
  import { Button, Segmented, TextArea, TextField } from '../components/ui.jsx'
- import { esc, printDocument } from '../lib/print-doc.js'
++import { esc, printDocument } from '../lib/print-doc.js'
 +import { copyRoutine, personalRoutines as getPersonalRoutines } from '../lib/routines.js'
 +import { confirmSheet } from '../sheets.jsx'
  
@@ -230,6 +394,10 @@ index 8900d2a..dc2d987 100644
 +const studentRoutineName = (routine, student) => `${routine.name || 'Treino'} · ${student.name}`
 +const validISODate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
 +  && isoOf(new Date(`${value}T12:00:00`)) === value
++const sessionTimestamp = session => {
++  const at = Number(session?.at)
++  return Number.isFinite(at) && at > 0 ? at : null
++}
 +const routineIsScheduled = (S, routineId) => {
 +  const inWeek = Object.values(S.week || {}).some(ids => [].concat(ids || []).includes(routineId))
 +  const inDayPlan = Object.values(S.dayPlan || {}).includes(routineId)
@@ -291,10 +459,10 @@ index 8900d2a..dc2d987 100644
    const S = useStore(s => s.S)
    const students = S.coachStudents || []
    const sessions = S.coachSessions || []
--  const measurements = (S.coachMeasurements || []).filter(m => m.studentId === selectedId).sort((a, b) => (b.at || 0) - (a.at || 0))
 -  const routines = S.routines || []
    const [tab, setTab] = useState('dashboard')
    const [selectedId, setSelected] = useState(null)
++  const [measurementMetric, setMeasurementMetric] = useState('weight')
 +  const measurements = (S.coachMeasurements || []).filter(m => m.studentId === selectedId).sort((a, b) => (b.at || 0) - (a.at || 0))
 +  const routines = S.routines || []
 +  const personalRoutines = getPersonalRoutines(routines)
@@ -303,36 +471,68 @@ index 8900d2a..dc2d987 100644
 +  const assignedSourceIds = new Set(selectedRoutines.map(routine => routine.coachSourceRoutineId || routine.id))
 +  const availableRoutines = personalRoutines.filter(routine => !assignedSourceIds.has(routine.id))
 +  const selectedSessions = selected ? sessions.filter(session => session.studentId === selected.id).sort((a, b) => (b.at || 0) - (a.at || 0)) : []
++  const lastSessionByStudent = new Map()
++  for (const session of sessions) {
++    const at = sessionTimestamp(session)
++    if (at && at > (lastSessionByStudent.get(session.studentId) || 0)) lastSessionByStudent.set(session.studentId, at)
++  }
    const [query, setQuery] = useState('')
 -  const visible = students.filter(s => `${s.name} ${s.goal || ''}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')))
 +  const [studentFilter, setStudentFilter] = useState('all')
-+  const visible = students.filter(student => {
-+    const matchesQuery = `${student.name} ${student.goal || ''}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))
-+    const hasRoutine = (student.routineIds || []).some(id => routines.some(routine => routine.id === id))
-+    return matchesQuery && (studentFilter === 'all' || (studentFilter === 'assigned' ? hasRoutine : !hasRoutine))
-+  })
    const assignedCount = students.reduce((n, student) => n + (student.routineIds || []).filter(id => routines.some(r => r.id === id)).length, 0)
    const pendingStudents = students.filter(student => !(student.routineIds || []).some(id => routines.some(r => r.id === id)))
+-  const recentSessions = [...sessions].sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 5)
 +  const today = todayISO()
 +  const reviewCutoff = (() => { const date = new Date(); date.setDate(date.getDate() + 7); return isoOf(date) })()
 +  const reviewActions = students
 +    .filter(student => validISODate(student.nextReviewDate) && student.nextReviewDate <= reviewCutoff)
 +    .sort((a, b) => a.nextReviewDate.localeCompare(b.nextReviewDate))
 +    .map(student => ({ student, type: student.nextReviewDate < today ? 'overdue' : 'review' }))
++  const inactivityCutoff = (() => { const date = new Date(); date.setDate(date.getDate() - 14); return date.getTime() })()
++  const inactiveStudents = students
++    .filter(student => (lastSessionByStudent.get(student.id) || 0) < inactivityCutoff && lastSessionByStudent.has(student.id))
++    .sort((a, b) => lastSessionByStudent.get(a.id) - lastSessionByStudent.get(b.id))
++  const inactiveStudentIds = new Set(inactiveStudents.map(student => student.id))
++  const inactivityActions = inactiveStudents.map(student => ({ student, type: 'inactive' }))
 +  const followUpActions = [
-+    ...reviewActions,
++    ...reviewActions.filter(action => action.type === 'overdue'),
++    ...inactivityActions,
++    ...reviewActions.filter(action => action.type === 'review'),
 +    ...pendingStudents.map(student => ({ student, type: 'plan' })),
 +  ]
++  const visible = students.filter(student => {
++    const matchesQuery = `${student.name} ${student.goal || ''}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))
++    const hasRoutine = (student.routineIds || []).some(id => routines.some(routine => routine.id === id))
++    const matchesFilter = studentFilter === 'all'
++      || (studentFilter === 'assigned' && hasRoutine)
++      || (studentFilter === 'pending' && !hasRoutine)
++      || (studentFilter === 'inactive' && inactiveStudentIds.has(student.id))
++    return matchesQuery && matchesFilter
++  })
 +  const studentsForRoutine = routineId => students.filter(student => (student.routineIds || []).some(id => {
 +    const assigned = routines.find(routine => routine.id === id)
 +    return id === routineId || assigned?.coachSourceRoutineId === routineId
 +  }))
-   const recentSessions = [...sessions].sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 5)
++  const recentSessions = [...sessions].filter(session => sessionTimestamp(session)).sort((a, b) => sessionTimestamp(b) - sessionTimestamp(a)).slice(0, 5)
 +  const currentWeek = weekKey(todayISO(), weekStartOf(S))
 +  const sessionsThisWeek = sessions.filter(session => {
-+    const at = Number(session.at)
-+    return Number.isFinite(at) && at > 0 && weekKey(isoOf(new Date(at)), weekStartOf(S)) === currentWeek
++    const at = sessionTimestamp(session)
++    return at && weekKey(isoOf(new Date(at)), weekStartOf(S)) === currentWeek
 +  })
++  const selectedSessionsLast30Days = selectedSessions.filter(session => {
++    const at = sessionTimestamp(session)
++    return at && at <= Date.now() && at >= Date.now() - 30 * 86400000
++  })
++  const recentEfforts = selectedSessionsLast30Days.map(session => Number(session.effort)).filter(value => Number.isFinite(value) && value >= 1 && value <= 5)
++  const averageEffort = recentEfforts.length ? recentEfforts.reduce((sum, value) => sum + value, 0) / recentEfforts.length : null
++  const lastSelectedSessionAt = selectedSessions.map(sessionTimestamp).find(Boolean) || null
++  const daysSinceSelectedSession = lastSelectedSessionAt == null ? null : Math.floor((Date.now() - lastSelectedSessionAt) / 86400000)
++  const measurementLabels = { weight: 'Peso', waist: 'Cintura', hip: 'Quadril', bodyFat: 'Gordura %' }
++  const measurementUnits = { weight: 'kg', waist: 'cm', hip: 'cm', bodyFat: '%' }
++  const measurementPoints = [...measurements].reverse().filter(record => {
++    const value = Number(record[measurementMetric])
++    return validISODate(record.date) && record[measurementMetric] != null && Number.isFinite(value)
++  }).map(record => ({ t: new Date(`${record.date}T12:00:00`).getTime(), d: record.date, y: Number(record[measurementMetric]) }))
 +
 +  useEffect(() => {
 +    if (!hasLegacyStudentAssignments(useStore.getState().S)) return
@@ -380,7 +580,7 @@ index 8900d2a..dc2d987 100644
    })
  
    return <div className="narrow">
-@@ -53,15 +175,15 @@ export default function PersonalWorkspace() {
+@@ -51,15 +212,16 @@ export default function PersonalWorkspace() {
          <CardHead icon="chart" tint="var(--blue)" eyebrow="ACOMPANHAMENTO" title="Visão geral" sub="Resumo dos alunos, prescrições e sessões registradas." />
          <div className="grid" style={{ gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10, marginTop: 16 }}>
            <Metric icon="person" label="Alunos" value={students.length} onClick={() => setTab('students')} />
@@ -389,6 +589,7 @@ index 8900d2a..dc2d987 100644
            <Metric icon="clipboard" label="Treinos atribuídos" value={assignedCount} onClick={() => setTab('students')} />
 -          <Metric icon="checkCircle" label="Sessões concluídas" value={sessions.length} onClick={() => setTab('students')} />
 +          <Metric icon="checkCircle" label="Sessões esta semana" value={sessionsThisWeek.length} onClick={() => setTab('students')} />
++          <Metric icon="clock" label="Sem sessão há 14+ dias" value={inactiveStudents.length} onClick={() => { setStudentFilter('inactive'); setTab('students') }} />
          </div>
        </div>
        <div className="card">
@@ -397,11 +598,11 @@ index 8900d2a..dc2d987 100644
 -          <button className="grow" style={{ textAlign: 'left', background: 'none', color: 'inherit', border: 0 }} onClick={() => { setSelected(student.id); setTab('students') }}><strong>{student.name}</strong><span className="small muted" style={{ display: 'block' }}>{student.goal || 'Objetivo não informado'}</span></button>
 +        <CardHead icon="bolt" title="Próximas ações" sub={followUpActions.length ? `${followUpActions.length} acompanhamento(s) necessário(s)` : 'Nenhuma ação pendente.'} />
 +        {followUpActions.slice(0, 6).map(({ student, type }) => <div key={`${student.id}-${type}`} className="row" style={{ justifyContent: 'space-between', gap: 12, padding: '12px 0', borderTop: '1px solid var(--separator)' }}>
-+          <button className="grow" style={{ textAlign: 'left', background: 'none', color: 'inherit', border: 0 }} onClick={() => { setSelected(student.id); setTab('students') }}><strong>{student.name}</strong><span className="small muted" style={{ display: 'block' }}>{type === 'plan' ? 'Sem treino atribuído' : `${type === 'overdue' ? 'Reavaliação atrasada' : 'Reavaliação nesta semana'} · ${new Date(`${student.nextReviewDate}T12:00:00`).toLocaleDateString('pt-BR')}`}</span></button>
++          <button className="grow" style={{ textAlign: 'left', background: 'none', color: 'inherit', border: 0 }} onClick={() => { setSelected(student.id); setTab('students') }}><strong>{student.name}</strong><span className="small muted" style={{ display: 'block' }}>{type === 'plan' ? 'Sem treino atribuído' : type === 'inactive' ? `Sem sessão há ${Math.floor((Date.now() - lastSessionByStudent.get(student.id)) / 86400000)} dias · última em ${new Date(lastSessionByStudent.get(student.id)).toLocaleDateString('pt-BR')}` : `${type === 'overdue' ? 'Reavaliação atrasada' : 'Reavaliação nesta semana'} · ${new Date(`${student.nextReviewDate}T12:00:00`).toLocaleDateString('pt-BR')}`}</span></button>
            <Button size="sm" onClick={() => { setSelected(student.id); setTab('students') }}>Acompanhar</Button>
          </div>)}
          {students.length === 0 && <Button variant="primary" icon="plus" onClick={() => { setTab('students'); openSheet() }}>Cadastrar primeiro aluno</Button>}
-@@ -82,23 +204,38 @@ export default function PersonalWorkspace() {
+@@ -80,21 +242,47 @@ export default function PersonalWorkspace() {
            <CardHead icon="person" eyebrow="ALUNO" title={selected.name} sub={selected.goal || 'Objetivo não informado'}
              action={<Button size="sm" variant="ghost" icon="chevronLeft" onClick={() => setSelected(null)}>Voltar</Button>} />
            {selected.email && <div className="row small muted" style={{ gap: 8, marginTop: 14 }}><Icon name="envelope" />{selected.email}</div>}
@@ -409,16 +610,15 @@ index 8900d2a..dc2d987 100644
            {selected.notes && <p className="small" style={{ whiteSpace: 'pre-wrap', margin: '14px 0 0' }}>{selected.notes}</p>}
            <div className="row" style={{ gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
              <Button size="sm" icon="pencil" onClick={() => openSheet(selected)}>Editar aluno</Button>
-             <Button size="sm" icon="plus" onClick={() => useUI.getState().openSheet(close => <MeasurementSheet close={close} student={selected} />)}>Registrar evolução</Button>
 -            {routines.some(r => (selected.routineIds || []).includes(r.id)) && <Button size="sm" variant="primary" icon="check" onClick={() => useUI.getState().openSheet(close => <SessionSheet close={close} student={selected} routine={routines.find(r => (selected.routineIds || []).includes(r.id))} />)}>Registrar sessão</Button>}
 -            <Button size="sm" variant="ghost" icon="trash" onClick={() => {
 -              update(s => {
 -                s.coachStudents = (s.coachStudents || []).filter(x => x.id !== selected.id)
 -                s.coachSessions = (s.coachSessions || []).filter(x => x.studentId !== selected.id)
--                s.coachMeasurements = (s.coachMeasurements || []).filter(x => x.studentId !== selected.id)
 -              })
 -              setSelected(null)
 -            }}>Excluir</Button>
++            <Button size="sm" icon="plus" onClick={() => useUI.getState().openSheet(close => <MeasurementSheet close={close} student={selected} />)}>Registrar evolução</Button>
 +            {selectedRoutines.length > 0 && <Button size="sm" variant="primary" icon="check" onClick={() => selectedRoutines.length === 1
 +              ? useUI.getState().openSheet(close => <SessionSheet close={close} student={selected} routine={selectedRoutines[0]} />)
 +              : useUI.getState().openSheet(close => <SessionRoutineSheet close={close} student={selected} routines={selectedRoutines} />)}>Registrar sessão</Button>}
@@ -446,11 +646,20 @@ index 8900d2a..dc2d987 100644
          </div>
          <div className="card">
 -          <CardHead icon="calendar" title="Treinos atribuídos" sub="Rotinas da sua biblioteca" />
++          <CardHead icon="clock" title="Frequência de treinos" sub="Resumo das sessões registradas nos últimos 30 dias." />
++          <div className="grid" style={{ gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8, marginTop: 12 }}>
++            <SummaryMetric label="Sessões" value={selectedSessionsLast30Days.length} />
++            <SummaryMetric label="Esforço médio" value={averageEffort == null ? '—' : `${averageEffort.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}/5`} />
++            <SummaryMetric label="Última sessão" value={daysSinceSelectedSession == null ? '—' : daysSinceSelectedSession === 0 ? 'Hoje' : `${daysSinceSelectedSession} dias`} />
++          </div>
++          {lastSelectedSessionAt && <div className="small muted" style={{ marginTop: 10 }}>Registrada em {new Date(lastSelectedSessionAt).toLocaleDateString('pt-BR')}</div>}
++        </div>
++        <div className="card">
 +          <CardHead icon="calendar" title="Treinos atribuídos" sub="Cada aluno recebe uma cópia independente da rotina." />
            {(selected.routineIds || []).map(id => {
              const routine = routines.find(r => r.id === id)
              if (!routine) return null
-@@ -106,61 +243,87 @@ export default function PersonalWorkspace() {
+@@ -102,42 +290,93 @@ export default function PersonalWorkspace() {
                <button className="grow" style={{ textAlign: 'left', background: 'none', color: 'inherit', border: 0 }} onClick={() => nav(`/plan/r/${id}`)}>
                  <strong>{routine.name}</strong><div className="small muted">{routine.ex?.length || 0} exercícios</div>
                </button>
@@ -467,37 +676,37 @@ index 8900d2a..dc2d987 100644
 +          <Button icon="plus" onClick={() => useUI.getState().openSheet(close => <AssignSheet close={close} student={selected} routines={availableRoutines} totalRoutines={personalRoutines.length} assign={assign} />)}>Atribuir treino</Button>
          </div>
          <div className="card">
-           <CardHead icon="chart" title="Evolução do aluno" sub="Acompanhe medidas corporais ao longo do tempo."
-             action={measurements.length ? <Button size="sm" variant="ghost" icon="download" onClick={() => printEvolution(selected, measurements)}>Exportar PDF</Button> : null} />
-           {measurements.length ? <>
-             <div className="grid" style={{ gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8, margin: '12px 0' }}>
--              <MeasureMetric label="Peso" value={latest(measurements, 'weight')} unit="kg" />
--              <MeasureMetric label="Cintura" value={latest(measurements, 'waist')} unit="cm" />
--              <MeasureMetric label="Quadril" value={latest(measurements, 'hip')} unit="cm" />
--              <MeasureMetric label="Gordura corporal" value={latest(measurements, 'bodyFat')} unit="%" />
+-          <CardHead icon="clock" title="Histórico de sessões" />
+-          {sessions.filter(x => x.studentId === selected.id).sort((a, b) => (b.at || 0) - (a.at || 0)).map(session => {
++          <CardHead icon="chart" title="Evolução do aluno" sub="Acompanhe medidas corporais ao longo do tempo."
++            action={measurements.length ? <Button size="sm" variant="ghost" icon="download" onClick={() => printEvolution(selected, measurements)}>Exportar PDF</Button> : null} />
++          {measurements.length ? <>
++            <Segmented className="seg-scroll" value={measurementMetric} onChange={setMeasurementMetric} options={Object.entries(measurementLabels).map(([value, label]) => ({ value, label }))} />
++            <div className="chart" style={{ marginTop: 12 }}><LineChart points={measurementPoints} h={140} unit={measurementUnits[measurementMetric]} color="var(--teal)" /></div>
++            <div className="grid" style={{ gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8, margin: '12px 0' }}>
 +              <MeasureMetric label="Peso" value={latest(measurements, 'weight')} unit="kg" change={changeFromPrevious(measurements, 'weight')} />
 +              <MeasureMetric label="Cintura" value={latest(measurements, 'waist')} unit="cm" change={changeFromPrevious(measurements, 'waist')} />
 +              <MeasureMetric label="Quadril" value={latest(measurements, 'hip')} unit="cm" change={changeFromPrevious(measurements, 'hip')} />
 +              <MeasureMetric label="Gordura corporal" value={latest(measurements, 'bodyFat')} unit="%" change={changeFromPrevious(measurements, 'bodyFat')} />
-             </div>
-             {[...measurements].reverse().map(record => <div key={record.id} className="row" style={{ justifyContent: 'space-between', gap: 12, padding: '10px 0', borderTop: '1px solid var(--separator)' }}>
-               <span><strong>{new Date(`${record.date}T12:00:00`).toLocaleDateString('pt-BR')}</strong><span className="small muted" style={{ display: 'block' }}>{[
-                 record.weight != null && `${record.weight} kg`, record.waist != null && `cintura ${record.waist} cm`, record.hip != null && `quadril ${record.hip} cm`, record.bodyFat != null && `${record.bodyFat}% gordura`,
-               ].filter(Boolean).join(' · ')}</span>{record.note && <span className="small" style={{ display: 'block', marginTop: 4 }}>{record.note}</span>}</span>
--              <Button size="sm" variant="ghost" icon="trash" aria-label="Excluir registro" onClick={() => update(s => { s.coachMeasurements = (s.coachMeasurements || []).filter(x => x.id !== record.id) })} />
++            </div>
++            {[...measurements].reverse().map(record => <div key={record.id} className="row" style={{ justifyContent: 'space-between', gap: 12, padding: '10px 0', borderTop: '1px solid var(--separator)' }}>
++              <span><strong>{new Date(`${record.date}T12:00:00`).toLocaleDateString('pt-BR')}</strong><span className="small muted" style={{ display: 'block' }}>{[
++                record.weight != null && `${record.weight} kg`, record.waist != null && `cintura ${record.waist} cm`, record.hip != null && `quadril ${record.hip} cm`, record.bodyFat != null && `${record.bodyFat}% gordura`,
++              ].filter(Boolean).join(' · ')}</span>{record.note && <span className="small" style={{ display: 'block', marginTop: 4 }}>{record.note}</span>}</span>
++              <div className="row" style={{ gap: 4 }}>
++              <Button size="sm" variant="ghost" icon="pencil" aria-label="Editar registro" onClick={() => useUI.getState().openSheet(close => <MeasurementSheet close={close} student={selected} measurement={record} />)} />
 +              <Button size="sm" variant="ghost" icon="trash" aria-label="Excluir registro" onClick={() => confirmSheet({
 +                title: 'Excluir registro de evolução?',
 +                message: `As medidas de ${new Date(`${record.date}T12:00:00`).toLocaleDateString('pt-BR')} serão removidas. Esta ação não pode ser desfeita.`,
 +                confirmText: 'Excluir registro', cancelText: 'Cancelar', danger: true,
 +                onConfirm: () => update(s => { s.coachMeasurements = (s.coachMeasurements || []).filter(x => x.id !== record.id) }),
 +              })} />
-             </div>)}
-           </> : <EmptyState icon="chart" title="Sem medidas registradas" text="Adicione peso e medidas para acompanhar a evolução deste aluno." />}
-           <Button icon="plus" onClick={() => useUI.getState().openSheet(close => <MeasurementSheet close={close} student={selected} />)}>Adicionar medidas</Button>
-         </div>
-         <div className="card">
--          <CardHead icon="clock" title="Histórico de sessões" />
--          {sessions.filter(x => x.studentId === selected.id).sort((a, b) => (b.at || 0) - (a.at || 0)).map(session => {
++              </div>
++            </div>)}
++          </> : <EmptyState icon="chart" title="Sem medidas registradas" text="Adicione peso e medidas para acompanhar a evolução deste aluno." />}
++          <Button icon="plus" onClick={() => useUI.getState().openSheet(close => <MeasurementSheet close={close} student={selected} />)}>Adicionar medidas</Button>
++        </div>
++        <div className="card">
 +          <CardHead icon="clock" title="Histórico de sessões" action={selectedSessions.length ? <Button size="sm" variant="ghost" icon="download" onClick={() => printSessions(selected, selectedSessions, routines)}>Exportar PDF</Button> : null} />
 +          {selectedSessions.map(session => {
              const routine = routines.find(r => r.id === session.routineId)
@@ -523,7 +732,7 @@ index 8900d2a..dc2d987 100644
            <CardHead icon="person" tint="var(--blue)" eyebrow="ACOMPANHAMENTO" title={`${students.length} ${students.length === 1 ? 'aluno' : 'alunos'}`}
              action={<Button size="sm" variant="primary" icon="plus" onClick={() => openSheet()}>Novo aluno</Button>} />
 +          {students.length > 0 && <Segmented value={studentFilter} onChange={setStudentFilter} options={[
-+            { value: 'all', label: 'Todos' }, { value: 'assigned', label: 'Com treino' }, { value: 'pending', label: 'Sem treino' },
++            { value: 'all', label: 'Todos' }, { value: 'assigned', label: 'Com treino' }, { value: 'pending', label: 'Sem treino' }, { value: 'inactive', label: 'Inativos' },
 +          ]} />}
            {students.length > 0 && <TextField value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar aluno" style={{ marginTop: 14 }} />}
          </div>
@@ -532,9 +741,10 @@ index 8900d2a..dc2d987 100644
 -        </button>) : <EmptyState icon="person" title={query ? 'Nenhum aluno encontrado' : 'Sua lista de alunos começa aqui'} text={query ? 'Tente outro nome.' : 'Cadastre seus alunos e organize os treinos de cada um.'}>
 -          {!query && <Button variant="primary" icon="plus" onClick={() => openSheet()}>Cadastrar aluno</Button>}
 +        {visible.length ? visible.map(student => {
-+          const lastSession = sessions.filter(session => session.studentId === student.id).sort((a, b) => (b.at || 0) - (a.at || 0))[0]
++          const lastAt = lastSessionByStudent.get(student.id)
++          const daysSince = lastAt ? Math.floor((Date.now() - lastAt) / 86400000) : null
 +          return <button key={student.id} className="card tap-host" style={{ width: '100%', textAlign: 'left', color: 'inherit' }} onClick={() => setSelected(student.id)}>
-+            <div className="row" style={{ gap: 12 }}><span className="lrow-i"><Icon name="person" /></span><span className="grow"><strong>{student.name}</strong><span className="small muted" style={{ display: 'block', marginTop: 4 }}>{student.goal || 'Objetivo não informado'} · {(student.routineIds || []).length} treinos</span><span className="small muted" style={{ display: 'block', marginTop: 3 }}>{lastSession?.at ? `Última sessão: ${new Date(lastSession.at).toLocaleDateString('pt-BR')}` : 'Nenhuma sessão registrada'}</span></span><Icon name="chevronRight" className="chev" /></div>
++            <div className="row" style={{ gap: 12 }}><span className="lrow-i"><Icon name="person" /></span><span className="grow"><strong>{student.name}</strong><span className="small muted" style={{ display: 'block', marginTop: 4 }}>{student.goal || 'Objetivo não informado'} · {(student.routineIds || []).length} treinos</span><span className="small muted" style={{ display: 'block', marginTop: 3 }}>{lastAt ? `Última sessão: ${daysSince === 0 ? 'hoje' : `há ${daysSince} dias`} · ${new Date(lastAt).toLocaleDateString('pt-BR')}` : 'Nenhuma sessão registrada'}</span></span><Icon name="chevronRight" className="chev" /></div>
 +          </button>
 +        }) : <EmptyState icon="person" title={students.length ? 'Nenhum aluno encontrado' : 'Sua lista de alunos começa aqui'} text={students.length ? 'Altere a busca ou o filtro para ver outros alunos.' : 'Cadastre seus alunos e organize os treinos de cada um.'}>
 +          {!students.length && <Button variant="primary" icon="plus" onClick={() => openSheet()}>Cadastrar aluno</Button>}
@@ -558,12 +768,24 @@ index 8900d2a..dc2d987 100644
          </div>}
          {(r.ex || []).slice(0, 4).map((e, i) => <div className="small muted" key={`${e.id}-${i}`} style={{ paddingTop: 8 }}>{e.name || e.n || e.id}</div>)}
        </div>) : <EmptyState icon="dumbbell" title="Nenhum treino criado" text="Monte uma rotina na tela Plan. Depois, você poderá atribuí-la a um aluno."><Button variant="primary" onClick={() => nav('/plan')}>Abrir Plan</Button></EmptyState>}
-@@ -180,8 +343,15 @@ function latest(records, field) {
-   return value == null ? '—' : value
+@@ -152,39 +391,152 @@ function Metric({ icon, label, value, onClick }) {
+   </button>
  }
  
--function MeasureMetric({ label, value, unit }) {
--  return <div className="card" style={{ margin: 0, padding: 12 }}><span className="small muted">{label}</span><div style={{ fontSize: 21, fontWeight: 650, marginTop: 4 }}>{value}<span className="small muted" style={{ marginLeft: 4 }}>{value === '—' ? '' : unit}</span></div></div>
+-function SessionSheet({ close, student, routine }) {
+-  const [effort, setEffort] = useState(3)
+-  const [feedback, setFeedback] = useState('')
++function SummaryMetric({ label, value }) {
++  return <div className="card" style={{ margin: 0, padding: 12, minWidth: 0 }}>
++    <span className="small muted">{label}</span><div style={{ fontSize: 20, fontWeight: 650, marginTop: 6, overflowWrap: 'anywhere' }}>{value}</div>
++  </div>
++}
++
++function latest(records, field) {
++  const value = records.find(record => record[field] != null)?.[field]
++  return value == null ? '—' : value
++}
++
 +function changeFromPrevious(records, field) {
 +  const values = records.filter(record => record[field] != null && Number.isFinite(Number(record[field]))).slice(0, 2)
 +  if (values.length < 2) return null
@@ -573,16 +795,51 @@ index 8900d2a..dc2d987 100644
 +function MeasureMetric({ label, value, unit, change }) {
 +  const changeText = change == null ? '' : `${change > 0 ? '+' : ''}${change.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} ${unit} vs. anterior`
 +  return <div className="card" style={{ margin: 0, padding: 12 }}><span className="small muted">{label}</span><div style={{ fontSize: 21, fontWeight: 650, marginTop: 4 }}>{value}<span className="small muted" style={{ marginLeft: 4 }}>{value === '—' ? '' : unit}</span></div>{changeText && <span className="small muted" style={{ display: 'block', marginTop: 4 }}>{changeText}</span>}</div>
- }
- 
- function MeasurementSheet({ close, student }) {
-@@ -223,39 +393,73 @@ function printEvolution(student, records) {
-   printDocument(html, `OpenGym - Evolução - ${student.name}`)
- }
- 
--function SessionSheet({ close, student, routine }) {
--  const [effort, setEffort] = useState(3)
--  const [feedback, setFeedback] = useState('')
++}
++
++function MeasurementSheet({ close, student, measurement }) {
++  const today = todayISO()
++  const [date, setDate] = useState(validISODate(measurement?.date) ? measurement.date : today)
++  const [weight, setWeight] = useState(measurement?.weight == null ? '' : String(measurement.weight))
++  const [waist, setWaist] = useState(measurement?.waist == null ? '' : String(measurement.waist))
++  const [hip, setHip] = useState(measurement?.hip == null ? '' : String(measurement.hip))
++  const [bodyFat, setBodyFat] = useState(measurement?.bodyFat == null ? '' : String(measurement.bodyFat))
++  const [note, setNote] = useState(measurement?.note || '')
++  const save = () => {
++    const fields = { weight, waist, hip, bodyFat }
++    const values = Object.fromEntries(Object.entries(fields).filter(([, value]) => value.trim() !== '').map(([key, value]) => [key, Number(value.replace(',', '.'))]))
++    if (!validISODate(date) || date > today || !Object.keys(values).length || Object.values(values).some(value => !Number.isFinite(value) || value < 0) || (values.bodyFat != null && values.bodyFat > 100)) return
++    update(s => {
++      if (!Array.isArray(s.coachMeasurements)) s.coachMeasurements = []
++      const next = { ...(measurement || {}), id: measurement?.id || uid(), studentId: student.id, date, at: new Date(`${date}T12:00:00`).getTime(), ...Object.fromEntries(Object.keys(fields).map(key => [key, values[key] ?? null])), note: note.trim(), _ts: Date.now() }
++      if (measurement) {
++        const index = s.coachMeasurements.findIndex(item => item.id === measurement.id)
++        if (index >= 0) s.coachMeasurements[index] = next
++        else s.coachMeasurements.push(next)
++      } else s.coachMeasurements.push(next)
++    })
++    close()
++  }
++  return <div className="sheet-content">
++    <h3>{measurement ? 'Editar evolução' : 'Registrar evolução'}</h3><p className="muted small">Medidas de {student.name}. Preencha os campos disponíveis.</p>
++    <label className="lbl2">Data</label><TextField type="date" max={today} value={date} onChange={e => setDate(e.target.value)} />
++    <div className="grid" style={{ gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10, marginTop: 12 }}>
++      <div><label className="lbl2">Peso (kg)</label><TextField type="number" min="0" step="0.1" value={weight} onChange={e => setWeight(e.target.value)} placeholder="Ex.: 72,5" /></div>
++      <div><label className="lbl2">Cintura (cm)</label><TextField type="number" min="0" step="0.1" value={waist} onChange={e => setWaist(e.target.value)} placeholder="Ex.: 82" /></div>
++      <div><label className="lbl2">Quadril (cm)</label><TextField type="number" min="0" step="0.1" value={hip} onChange={e => setHip(e.target.value)} placeholder="Ex.: 98" /></div>
++      <div><label className="lbl2">Gordura corporal (%)</label><TextField type="number" min="0" max="100" step="0.1" value={bodyFat} onChange={e => setBodyFat(e.target.value)} placeholder="Ex.: 22" /></div>
++    </div>
++    <label className="lbl2" style={{ display: 'block', marginTop: 14 }}>Observações</label><TextArea rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="Opcional" />
++    <div className="row" style={{ gap: 8, marginTop: 18 }}><Button variant="ghost" onClick={close}>Cancelar</Button><Button variant="primary" disabled={!validISODate(date) || date > today || ![weight, waist, hip, bodyFat].some(value => value.trim())} onClick={save}>{measurement ? 'Salvar alterações' : 'Salvar medidas'}</Button></div>
++  </div>
++}
++
++function printEvolution(student, records) {
++  const rows = [...records].reverse().map(record => `<tr><td>${esc(new Date(`${record.date}T12:00:00`).toLocaleDateString('pt-BR'))}</td><td>${record.weight ?? '—'}</td><td>${record.waist ?? '—'}</td><td>${record.hip ?? '—'}</td><td>${record.bodyFat ?? '—'}</td><td>${esc(record.note || '')}</td></tr>`).join('')
++  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Evolução - ${esc(student.name)}</title><style>@page{size:auto;margin:16mm}*{box-sizing:border-box}body{font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;color:#17191f;margin:0}.head{border-bottom:3px solid #a3e635;padding-bottom:14px;margin-bottom:24px}.brand{font-size:12px;font-weight:700;letter-spacing:.12em;color:#667085;text-transform:uppercase}.brand i{display:inline-block;width:10px;height:10px;background:#a3e635;border-radius:50%;margin-right:8px}h1{font-size:26px;margin:12px 0 2px}.muted{color:#667085}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{text-align:left;padding:9px 6px;border-bottom:1px solid #e5e7eb}th{font-size:11px;text-transform:uppercase;color:#667085}@media print{tr{break-inside:avoid}}</style></head><body><header class="head"><div class="brand"><i></i>OpenGym · Acompanhamento</div><h1>Evolução de ${esc(student.name)}</h1><div class="muted">${esc(student.goal || 'Objetivo não informado')} · Relatório gerado em ${new Date().toLocaleDateString('pt-BR')}</div></header><h2>Medidas corporais</h2><table><thead><tr><th>Data</th><th>Peso (kg)</th><th>Cintura (cm)</th><th>Quadril (cm)</th><th>Gordura (%)</th><th>Observações</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
++  printDocument(html, `OpenGym - Evolução - ${student.name}`)
++}
++
 +function printSessions(student, records, routines) {
 +  const rows = [...records].reverse().map(session => {
 +    const routine = routines.find(item => item.id === session.routineId)
@@ -596,28 +853,42 @@ index 8900d2a..dc2d987 100644
 +}
 +
 +function SessionSheet({ close, student, routine, session }) {
++  const existingAt = sessionTimestamp(session)
++  const [date, setDate] = useState(existingAt ? isoOf(new Date(existingAt)) : todayISO())
++  const [time, setTime] = useState(existingAt ? new Date(existingAt).toTimeString().slice(0, 5) : new Date().toTimeString().slice(0, 5))
 +  const [effort, setEffort] = useState(session?.effort || 3)
 +  const [feedback, setFeedback] = useState(session?.feedback || '')
++  const today = todayISO()
++  const currentTime = new Date().toTimeString().slice(0, 5)
++  const validTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(time)
++  const canSave = validISODate(date) && (date < today || (date === today && validTime && time <= currentTime)) && validTime
    const save = () => {
++    if (!canSave) return
++    const at = new Date(`${date}T${time}:00`).getTime()
++    if (!Number.isFinite(at)) return
      update(s => {
        if (!Array.isArray(s.coachSessions)) s.coachSessions = []
 -      s.coachSessions.push({ id: uid(), studentId: student.id, routineId: routine?.id || null, at: Date.now(), effort, feedback: feedback.trim(), _ts: Date.now() })
 +      const now = Date.now()
 +      const existing = session && s.coachSessions.find(item => item.id === session.id)
-+      if (existing) Object.assign(existing, { effort, feedback: feedback.trim(), _ts: now })
-+      else s.coachSessions.push({ id: uid(), studentId: student.id, routineId: routine?.id || null, at: now, effort, feedback: feedback.trim(), _ts: now })
++      if (existing) Object.assign(existing, { at, effort, feedback: feedback.trim(), _ts: now })
++      else s.coachSessions.push({ id: uid(), studentId: student.id, routineId: routine?.id || null, at, effort, feedback: feedback.trim(), _ts: now })
      })
      close()
    }
    return <div className="sheet-content">
 -    <h3>Registrar sessão</h3><p className="muted small">{student.name}{routine ? ` · ${routine.name}` : ''}</p>
 +    <h3>{session ? 'Editar sessão' : 'Registrar sessão'}</h3><p className="muted small">{student.name}{routine ? ` · ${routine.name}` : ''}</p>
++    <div className="grid" style={{ gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
++      <div><label className="lbl2">Data</label><TextField type="date" max={todayISO()} value={date} onChange={e => setDate(e.target.value)} /></div>
++      <div><label className="lbl2">Horário</label><TextField type="time" value={time} onChange={e => setTime(e.target.value)} /></div>
++    </div>
      <label className="lbl2" style={{ display: 'block', marginBottom: 8 }}>Esforço percebido</label>
      <Segmented value={effort} onChange={setEffort} options={[1, 2, 3, 4, 5].map(value => ({ value, label: String(value) }))} />
      <label className="lbl2" style={{ display: 'block', marginTop: 16 }}>Feedback ou observações</label>
      <TextArea rows={4} value={feedback} onChange={e => setFeedback(e.target.value)} placeholder="Como foi o treino?" />
 -    <div className="row" style={{ gap: 8, marginTop: 18 }}><Button variant="ghost" onClick={close}>Cancelar</Button><Button variant="primary" icon="check" onClick={save}>Salvar sessão</Button></div>
-+    <div className="row" style={{ gap: 8, marginTop: 18 }}><Button variant="ghost" onClick={close}>Cancelar</Button><Button variant="primary" icon="check" onClick={save}>{session ? 'Salvar alterações' : 'Salvar sessão'}</Button></div>
++    <div className="row" style={{ gap: 8, marginTop: 18 }}><Button variant="ghost" onClick={close}>Cancelar</Button><Button variant="primary" icon="check" disabled={!canSave} onClick={save}>{session ? 'Salvar alterações' : 'Salvar sessão'}</Button></div>
 +  </div>
 +}
 +
@@ -659,7 +930,7 @@ index 8900d2a..dc2d987 100644
      })
      close()
    }
-@@ -263,16 +467,19 @@ function StudentSheet({ close, student }) {
+@@ -192,16 +544,19 @@ function StudentSheet({ close, student }) {
      <h3>{student ? 'Editar aluno' : 'Novo aluno'}</h3>
      <label className="lbl2">Nome</label><TextField autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="Nome completo" />
      <label className="lbl2" style={{ display: 'block', marginTop: 14 }}>Objetivo</label><TextField value={goal} onChange={e => setGoal(e.target.value)} placeholder="Ex.: força, condicionamento" />
@@ -685,7 +956,7 @@ index 8900d2a..dc2d987 100644
      </button>)}
      <Button variant="ghost" onClick={close}>Fechar</Button>
 diff --git a/frontend/src/views/Plan.jsx b/frontend/src/views/Plan.jsx
-index 5569a6d..ac51cd4 100644
+index 5569a6d6e1a820fc9ea28e439e3ea8312da22bd2..ac51cd40f2e95c9bf4a58080bd092e39fb62e7f1 100644
 --- a/frontend/src/views/Plan.jsx
 +++ b/frontend/src/views/Plan.jsx
 @@ -13,7 +13,7 @@ import EmptyState from '../components/EmptyState.jsx'
@@ -768,7 +1039,7 @@ index 5569a6d..ac51cd4 100644
  
    const addRoutine = () => {
 diff --git a/frontend/src/views/RoutineEdit.jsx b/frontend/src/views/RoutineEdit.jsx
-index 0d744eb..5297bec 100644
+index 0d744eb3665b7f77681b9ac30182d72d1345be2f..5297bec868525b459259b6a6d3ade4ec2012d47b 100644
 --- a/frontend/src/views/RoutineEdit.jsx
 +++ b/frontend/src/views/RoutineEdit.jsx
 @@ -597,7 +597,12 @@ export default function RoutineEdit() {
@@ -786,7 +1057,7 @@ index 0d744eb..5297bec 100644
          }
        })}><Icon name="trash" className="re-act-i" /><span className="lrow-m"><span className="lrow-t">{t('Delete routine')}</span>
 diff --git a/frontend/src/views/Workout.jsx b/frontend/src/views/Workout.jsx
-index 2d4cf30..2a0c6ef 100644
+index 2d4cf30ee167b7c67b9d3cb16fc2e6c6dace47a5..2a0c6ef29f0a643b771ecf91083e5fcaecb5c318 100644
 --- a/frontend/src/views/Workout.jsx
 +++ b/frontend/src/views/Workout.jsx
 @@ -45,7 +45,7 @@ import { defaultIncrement, weightIncrement, stepWeight } from '../lib/progressio
@@ -816,6 +1087,32 @@ index 2d4cf30..2a0c6ef 100644
    </div>
  }
  
--- 
-2.51.1
-
+diff --git a/frontend/vite.config.js b/frontend/vite.config.js
+index a566b81088a8547e9a8b08f23bdf76872d691ef9..4a21fa0fbc5b4ac74aec1721bf564e579603200c 100644
+--- a/frontend/vite.config.js
++++ b/frontend/vite.config.js
+@@ -26,7 +26,9 @@ const umami = {
+   }
+ }
+ 
+-// Stamp the offline shell cache with the built bundle so each deployed PWA gets a fresh cache.
++// Stamp the offline shell cache with the built shell and install metadata. The manifest is fetched
++// by the browser as well as the service worker; including it here makes a manifest-only change
++// (shortcuts, app name, install colours) produce a new worker/cache version too.
+ let outDir = fileURLToPath(new URL('./dist/', import.meta.url))
+ let lazy = []
+ const swStamp = {
+@@ -35,9 +37,11 @@ const swStamp = {
+   configResolved(config) { outDir = resolve(config.root, config.build.outDir) },
+   generateBundle(_, bundle) { lazy = lazyAssets(bundle) },
+   closeBundle() {
+-    const html = join(outDir, 'index.html'), sw = join(outDir, 'sw.js')
++    const html = join(outDir, 'index.html'), manifest = join(outDir, 'manifest.json'), sw = join(outDir, 'sw.js')
+     if (!existsSync(html) || !existsSync(sw)) return
+-    const stamp = createHash('sha256').update(readFileSync(html)).digest('hex').slice(0, 10)
++    const hash = createHash('sha256').update(readFileSync(html))
++    if (existsSync(manifest)) hash.update('\0').update(readFileSync(manifest))
++    const stamp = hash.digest('hex').slice(0, 10)
+     writeFileSync(sw, stampSw(readFileSync(sw, 'utf8'), { stamp, lazy }))
+   }
+ }
