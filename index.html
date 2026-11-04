@@ -91,7 +91,39 @@
 .epm-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.epm-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center;color:var(--muted);font-size:11px}.epm-day{min-width:0;min-height:75px;padding:7px 5px;text-align:left;display:flex;flex-direction:column;gap:4px}.epm-day>span{font-weight:750}.epm-day small{font-size:9px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--accent)}.epm-day.today{border-color:var(--accent)}.epm-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.epm-metrics .card{padding:12px}.epm-metrics strong{display:block;font-size:20px;margin-top:5px}.epm-progress{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:12px 0 6px}.epm-progress span{height:100%;display:block;background:var(--accent);border-radius:inherit}.epm-photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}.epm-photo{padding:0;overflow:hidden;position:relative;aspect-ratio:1}.epm-photo img{width:100%;height:100%;object-fit:cover;display:block}.epm-photo span{position:absolute;inset:auto 0 0;background:#08111ccc;color:#fff;padding:6px;font-size:11px}.epm-shortcuts{margin:0 0 16px}.epm-upload{display:inline-flex;align-items:center;cursor:pointer}.epm-profile{margin-top:16px}.epm-select{max-width:420px;margin:0 0 14px}.epm-home{margin-top:16px}.tag.good{background:#e4f4ec;color:#1c745b}body.dark .tag.good{background:#19382d;color:#80dbba}.tag.warn{background:#fff0df;color:#97601c}body.dark .tag.warn{background:#3b3022;color:#ffd08a}
 @media(max-width:640px){.epm-calendar{gap:3px}.epm-day{min-height:58px;padding:5px 3px}.epm-day small{font-size:8px}.epm-weekdays{font-size:9px}.epm-metrics{grid-template-columns:1fr}.epm-metrics .card{display:flex;justify-content:space-between;align-items:center}.epm-metrics strong{font-size:16px;margin:0}}
 </style>
-</head><body>
+<style id="ep-mobile-dock-stability">
+@media(max-width:640px){
+  .rail{
+    position:fixed!important;top:auto!important;bottom:calc(10px + env(safe-area-inset-bottom,0px))!important;
+    left:50%!important;right:auto!important;transform:translate3d(-50%,0,0)!important;
+    width:min(680px,calc(100vw - 24px))!important;height:auto!important;min-height:74px!important;
+    display:flex!important;justify-content:center!important;align-items:center!important;
+    padding:6px 7px!important;gap:0!important;overflow:visible!important;
+    z-index:50!important;border:1px solid #3a4d68!important;border-radius:24px!important;
+    background:rgba(17,29,46,.94)!important;box-shadow:0 12px 32px #0006!important;
+    backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  }
+  .rail #nav{
+    display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;
+    flex:1 1 auto!important;width:100%!important;min-width:0!important;gap:2px!important;overflow:visible!important;
+  }
+  .rail #nav button{
+    min-width:0!important;width:auto!important;max-width:none!important;min-height:58px!important;
+    padding:5px 1px!important;border:0!important;border-radius:15px!important;
+    font-size:clamp(8px,2.3vw,10px)!important;line-height:1.08!important;white-space:normal!important;
+    overflow-wrap:anywhere!important;
+  }
+  .rail #nav button span:last-child{display:block!important;text-align:center!important;line-height:1.08!important}
+  .rail #nav button.active{background:color-mix(in srgb,var(--accent) 20%,transparent)!important;color:var(--accent)!important}
+  .rail #nav button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .rail .brand,.rail .bottom{display:none!important}
+  .main{padding-bottom:calc(132px + env(safe-area-inset-bottom,0px))!important}
+}
+@media(max-width:380px){
+  .rail{width:calc(100vw - 16px)!important;padding-left:4px!important;padding-right:4px!important}
+}
+@media(prefers-reduced-motion:reduce){.rail{scroll-behavior:auto!important}}
+</style></head><body>
 <div class="shell"><nav class="rail" aria-label="Navegação principal"><div class="brand">e</div><div id="nav" style="display:contents"></div><button class="bottom" id="themeRail" aria-label="Alternar tema"></button></nav><main class="main"><header class="top"><div class="row"><div class="wordmark">evolu<span>personal</span></div><span class="tag">ALPHA 0.21 · ETAPA 10 — PWA EM VALIDAÇÃO</span></div><div class="tools"><button id="modeBtn"></button><button id="themeBtn" aria-label="Alternar tema"></button></div></header><div id="app"><section class="notice" id="appBootFallback"><strong>Carregando a prévia do EvoluPersonal…</strong><p style="margin:6px 0 0">Se esta mensagem continuar, o navegador bloqueou ou interrompeu o JavaScript. Abra a versão corrigida em um navegador com JavaScript habilitado.</p></section></div><footer class="foot">EvoluPersonal · Alpha 0.21 · Etapas 7 a 10</footer></main></div>
 <dialog id="modal"><div class="between"><h2 id="modalTitle"></h2><button class="quiet" onclick="closeModal()" aria-label="Fechar janela">✕</button></div><div class="modalbody" id="modalBody"></div></dialog><div id="toast" role="status" hidden></div><div id="timer" hidden><small>DESCANSO</small><b id="clock">00:00</b><div class="row"><button onclick="pauseTimer()" id="pauseBtn">Pausar</button><button onclick="stopTimer()">Encerrar</button></div></div>
 <script>
