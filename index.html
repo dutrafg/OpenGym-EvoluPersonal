@@ -1722,19 +1722,22 @@ EvoluPrograms.boot();
       if (!worker) worker = await Promise.race([updateFound, new Promise(resolve => setTimeout(() => resolve(null), 1600))]);
       worker = pwaRegistration.installing || pwaRegistration.waiting || worker;
       if (!worker) return report('Verificação concluída. O aplicativo já está atualizado.');
-      const settled = worker.state === 'activated' || await Promise.race([
-        new Promise(resolve => {
-          const check = () => {
-            if (worker.state === 'activated') resolve(true);
-            else if (worker.state === 'redundant') resolve(false);
-          };
-          worker.addEventListener('statechange', check);
-          check();
-        }),
-        new Promise(resolve => setTimeout(() => resolve(false), 15000))
-      ]);
-      if (!settled) return report('A atualização ainda está sendo preparada. Tente novamente em alguns segundos.');
       if (pwaRegistration.waiting) pwaRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      const settled = worker.state === 'activated' || await new Promise(resolve => {
+        const finish = value => {
+          clearTimeout(timer);
+          worker.removeEventListener('statechange', check);
+          resolve(value);
+        };
+        const check = () => {
+          if (worker.state === 'activated') finish(true);
+          else if (worker.state === 'redundant') finish(false);
+        };
+        const timer = setTimeout(() => finish(false), 15000);
+        worker.addEventListener('statechange', check);
+        check();
+      });
+      if (!settled) return report('A atualização ainda está sendo preparada. Tente novamente em alguns segundos.');
       report('Atualização aplicada ao service worker. Recarregue o app para abrir a versão nova.');
     } catch (_) {
       report('Não foi possível verificar atualizações agora. Verifique a conexão e tente novamente.');
