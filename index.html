@@ -1977,7 +1977,16 @@ EvoluPrograms.boot();
   }
   window.epInstallPWA = async function () {
     if (!installPrompt) return toast('No celular, abra o menu do navegador e escolha “Instalar aplicativo” ou “Adicionar à tela inicial”.');
-    installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; render();
+    const promptEvent = installPrompt;
+    installPrompt = null;
+    try {
+      promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      if (choice?.outcome === 'accepted') toast('EvoluPersonal instalado neste dispositivo.');
+      render();
+    } catch (_) {
+      toast('Não foi possível concluir a instalação. Use o menu do navegador para adicionar o app à tela inicial.');
+    }
   };
   window.epCheckPWA = async function () {
     const el = document.getElementById('epPwaStatus');
@@ -1991,13 +2000,41 @@ EvoluPrograms.boot();
     if (storage && navigator.storage?.estimate) { try { const x = await navigator.storage.estimate(), used = (x.usage || 0) / 1048576, quota = (x.quota || 0) / 1048576; storage.textContent = 'Armazenamento do navegador: ' + used.toFixed(1) + ' MB usados de ' + quota.toFixed(0) + ' MB disponíveis.'; } catch (_) { storage.textContent = 'O navegador não informou o uso de armazenamento.'; } }
   };
   window.epUpdatePWA = async function () {
+    const status = document.getElementById('epPwaStatus');
+    const report = message => { if (status) status.textContent = message; toast(message); };
     try {
+      if (!window.isSecureContext || !('serviceWorker' in navigator)) {
+        return report('A verificação exige o app publicado em HTTPS.');
+      }
       pwaRegistration = pwaRegistration || await navigator.serviceWorker.getRegistration('./');
-      if (!pwaRegistration) return toast('Nenhum service worker foi encontrado. Use o endereço HTTPS publicado.');
+      if (!pwaRegistration) {
+        return report('Nenhum service worker ativo. Use “Verificar instalação” primeiro.');
+      }
+      let resolveFound;
+      const updateFound = new Promise(resolve => { resolveFound = resolve; });
+      pwaRegistration.addEventListener('updatefound', () => resolveFound(pwaRegistration.installing), { once: true });
       await pwaRegistration.update();
-      if (pwaRegistration.waiting) { pwaRegistration.waiting.postMessage({ type: 'SKIP_WAITING' }); return toast('Atualização encontrada. Recarregue o app em alguns segundos.'); }
-      toast('Verificação concluída. O aplicativo já está atualizado.');
-    } catch (_) { toast('Não foi possível verificar atualizações agora.'); }
+      let worker = pwaRegistration.installing || pwaRegistration.waiting;
+      if (!worker) worker = await Promise.race([updateFound, new Promise(resolve => setTimeout(() => resolve(null), 1600))]);
+      worker = pwaRegistration.installing || pwaRegistration.waiting || worker;
+      if (!worker) return report('Verificação concluída. O aplicativo já está atualizado.');
+      const settled = worker.state === 'activated' || await Promise.race([
+        new Promise(resolve => {
+          const check = () => {
+            if (worker.state === 'activated') resolve(true);
+            else if (worker.state === 'redundant') resolve(false);
+          };
+          worker.addEventListener('statechange', check);
+          check();
+        }),
+        new Promise(resolve => setTimeout(() => resolve(false), 15000))
+      ]);
+      if (!settled) return report('A atualização ainda está sendo preparada. Tente novamente em alguns segundos.');
+      if (pwaRegistration.waiting) pwaRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      report('Atualização aplicada ao service worker. Recarregue o app para abrir a versão nova.');
+    } catch (_) {
+      report('Não foi possível verificar atualizações agora. Verifique a conexão e tente novamente.');
+    }
   };
   const priorSettings = window.settings;
   window.settings = () => { const html = priorSettings() + pwaPanel(); setTimeout(window.epCheckPWA, 0); return html; };
