@@ -1,0 +1,821 @@
+From 834c92b954092ab205f5fb5af133665b30cbea5d Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Wed, 4 Nov 2026 07:10:00 -0300
+Subject: [PATCH] Complete student routines and reassessment dashboard
+
+---
+ README.md                                 |   2 +-
+ frontend/src/lib/routines.js              |  11 +
+ frontend/src/lib/routines.replace.test.js |  27 +-
+ frontend/src/lib/routines.update.test.js  |   8 +-
+ frontend/src/sheets.jsx                   |   9 +-
+ frontend/src/views/Home.jsx               |   6 +-
+ frontend/src/views/PersonalWorkspace.jsx  | 325 ++++++++++++++++++----
+ frontend/src/views/Plan.jsx               |  26 +-
+ frontend/src/views/RoutineEdit.jsx        |   7 +-
+ frontend/src/views/Workout.jsx            |   6 +-
+ 10 files changed, 335 insertions(+), 92 deletions(-)
+
+diff --git a/README.md b/README.md
+index 489c761..67baaca 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ EvoluPersonal is an independent training tracker based on the permitted openGym application code. This clean fork contains no upstream Git history or exercise-library records, name/instruction packs, exercise images, animations, or their download packs.
+ 
+-The exercise library contains 500 Portuguese records migrated from the owner's EvoluPersonal project and 149 newly created 3D GIFs from that project. The 296 legacy GIFs were not migrated because their origin has not been fully audited. The personal-trainer workspace adds student records and assigns routines built with the existing OpenGym plan editor.
++The exercise library contains 500 Portuguese records migrated from the owner's EvoluPersonal project and 149 newly created 3D GIFs from that project. The 296 legacy GIFs were not migrated because their origin has not been fully audited. The personal-trainer workspace adds student records, independent editable routine copies per student, session and measurement tracking, and dashboard follow-up for upcoming reassessments. Student routines stay separate from the user's personal plan.
+ 
+ ## License and attribution
+ 
+diff --git a/frontend/src/lib/routines.js b/frontend/src/lib/routines.js
+index f826569..9c3a17d 100644
+--- a/frontend/src/lib/routines.js
++++ b/frontend/src/lib/routines.js
+@@ -7,6 +7,12 @@ import { ownExerciseRest } from './supersetFlow.js'
+ import { warmupModeOf, ownRowsOf, ownRowsFromSession, sameOwnRows } from './warmup-ramp.js'
+ import { isRungRow } from './warmup-snap.js'
+ 
++// Coach copies live in S.routines so existing session/history code can resolve their ids, but
++// they belong to a student's plan and must stay out of the app user's personal library.
++export const isCoachStudentRoutine = routine => !!routine?.coachStudentId
++export const personalRoutines = routines => (Array.isArray(routines) ? routines : [])
++  .filter(routine => !isCoachStudentRoutine(routine) && !routine.coachArchived)
++
+ /**
+  * Create a deep copy of a routine with a new id and a "(Copy)" suffix.
+  * All exercises and their configuration are preserved independently.
+@@ -14,6 +20,11 @@ import { isRungRow } from './warmup-snap.js'
+ export function copyRoutine(routine, suffix = 'Copy') {
+   const copy = structuredClone(routine)
+   copy.id = uid()
++  // A manual copy becomes the user's own routine; student ownership is assigned explicitly by
++  // the personal workspace after it creates that student's private copy.
++  delete copy.coachStudentId
++  delete copy.coachSourceRoutineId
++  delete copy.coachArchived
+   // "Push (Copy)" copied again becomes "Push (Copy 2)", not "Push (Copy) (Copy)".
+   const esc = suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+   const m = new RegExp('^(.*) \\(' + esc + '(?: (\\d+))?\\)$').exec(routine.name || '')
+diff --git a/frontend/src/lib/routines.replace.test.js b/frontend/src/lib/routines.replace.test.js
+index 788725b..b13510d 100644
+--- a/frontend/src/lib/routines.replace.test.js
++++ b/frontend/src/lib/routines.replace.test.js
+@@ -6,14 +6,21 @@ import { buildCombinedEntries } from './session-merge.js'
+ import { buildCompletedWorkout } from './finish-workout.js'
+ import { lastEntryFor } from './history.js'
+ import { isWarmupRow } from './workout-model.js'
+-
+-const BENCH = '0025'      // barbell bench press
+-const DB_BENCH = '0289'   // dumbbell bench press
+-const PUSH_UP = '0662'    // push-up, body weight
+-const PULL_UP = '0652'    // pull-up, body weight
+-const BIKE = '2138'       // stationary bike, cardio
+-const ASSISTED_PULL_UP = '0015' // assisted pull-up, a leverage machine: the weight is help
+-const PULLDOWN = '0150'   // lat pulldown, cable
++import { registerCustom } from './exercises.js'
++
++const BENCH = 'md1'       // user's independent catalogue: barbell bench press
++const DB_BENCH = 'md3'    // user's independent catalogue: dumbbell bench press
++const PUSH_UP = 'md7'     // user's independent catalogue: push-up
++const PULL_UP = 'md62'    // user's independent catalogue: pull-up
++const BIKE = 'test-bike'
++const ALT_CARDIO = 'test-rower'
++const ASSISTED_PULL_UP = 'test-assisted-pull-up'
++const PULLDOWN = 'md70'   // user's independent catalogue: cable pulldown
++registerCustom([
++  { id: BIKE, n: 'Test stationary bike', bp: 'cardio', eq: 'stationary bike' },
++  { id: ALT_CARDIO, n: 'Test rower', bp: 'cardio', eq: 'rowing machine' },
++  { id: ASSISTED_PULL_UP, n: 'Assisted pull-up', bp: 'back', eq: 'leverage machine' },
++])
+ 
+ describe('replaceSlotExercise', () => {
+   it('keeps the slot\'s sets, reps, weight, rule, rest, warm-ups, note and superset', () => {
+@@ -81,8 +88,8 @@ describe('replaceSlotExercise', () => {
+   })
+ 
+   it('keeps a cardio slot\'s minutes and speed on another cardio exercise', () => {
+-    expect(replaceSlotExercise({ id: BIKE, sets: 2, min: 30, speed: 12 }, '3666'))
+-      .toEqual({ id: '3666', sets: 2, min: 30, speed: 12 })
++    expect(replaceSlotExercise({ id: BIKE, sets: 2, min: 30, speed: 12 }, ALT_CARDIO))
++      .toEqual({ id: ALT_CARDIO, sets: 2, min: 30, speed: 12 })
+   })
+ })
+ 
+diff --git a/frontend/src/lib/routines.update.test.js b/frontend/src/lib/routines.update.test.js
+index 59c6be2..847ccb5 100644
+--- a/frontend/src/lib/routines.update.test.js
++++ b/frontend/src/lib/routines.update.test.js
+@@ -3,10 +3,12 @@
+ import { describe, it, expect } from 'vitest'
+ import { routineSlotIndex, routineChangesFromEntry, updateRoutineFromEntry } from './routines.js'
+ import { MAX_PLANNED_WARMUPS } from './history.js'
++import { registerCustom } from './exercises.js'
+ 
+-const BENCH = '0025'    // barbell bench press
+-const ROW = '0027'      // barbell bent over row
+-const BIKE = '2138'     // stationary bike, cardio
++const BENCH = 'md1'     // user's independent catalogue: barbell bench press
++const ROW = 'md65'      // user's independent catalogue: barbell bent-over row
++const BIKE = 'test-update-bike'
++registerCustom([{ id: BIKE, n: 'Test stationary bike', bp: 'cardio', eq: 'stationary bike' }])
+ 
+ const work = n => Array.from({ length: n }, () => ({ w: 60, r: 5, done: false }))
+ const warm = n => Array.from({ length: n }, () => ({ w: 30, r: 5, done: false, phase: 'warmup' }))
+diff --git a/frontend/src/sheets.jsx b/frontend/src/sheets.jsx
+index c2a7c13..582ce25 100644
+--- a/frontend/src/sheets.jsx
++++ b/frontend/src/sheets.jsx
+@@ -66,6 +66,7 @@ import { speedUnitOf, toSpeed, fromSpeed } from './lib/speed.js'
+ import { clampIncline, inclineFits, INCLINE_MAX, INCLINE_STEP } from './lib/incline.js'
+ import { buildCompletedWorkout, sessionEnd } from './lib/finish-workout.js'
+ import { refillAfter } from './lib/rotation.js'
++import { personalRoutines } from './lib/routines.js'
+ import { isWarmupRow, hasCompletedWork } from './lib/workout-model.js'
+ import { ownExerciseRest } from './lib/supersetFlow.js'
+ import { entryTimes } from './lib/exercise-time.js'
+@@ -1480,7 +1481,7 @@ function AddToRoutine({ ex, close }) {
+     <h3 className={exerciseNameClass(ex)}>{t('Add “{0}”', exerciseNameFor(ex))}</h3>
+     <div className="muted small" style={{ marginBottom: 12 }}>{t('Pick a routine. Sets, reps and weight come next.')}</div>
+     <div className="list">
+-      {st.routines.map(r => <div key={r.id} className="item" {...tappable(() => pick(r.id))}>
++      {personalRoutines(st.routines).map(r => <div key={r.id} className="item" {...tappable(() => pick(r.id))}>
+         <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
+         <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
+         {r.ex.some(e => e.id === ex.id) && <span className="tag">{t('already in')}</span>}<Icon name="plus" className="chev" />
+@@ -2986,7 +2987,7 @@ function DayAssign({ day, close }) {
+     <div className="muted small" style={{ marginBottom: 10 }}>{t('Pick one routine, or more to train them together.')}</div>
+     <div className="list menu-list">
+       <div className="item menu-item" {...tappable(rest)}><span className="lrow-i" style={{ background: 'var(--surface-3)' }}><Icon name="moon" /></span><div className="grow"><div className="tt">{t('Rest day')}</div></div><span className={'menu-on' + (!cur.length ? ' is-on' : '')}><Icon name="check" /></span></div>
+-      {st.routines.map(r => {
++      {personalRoutines(st.routines).map(r => {
+         const on = cur.includes(r.id)
+         return <div key={r.id} className="item menu-item" aria-pressed={on} {...tappable(() => toggle(r.id))}>
+           <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
+@@ -3518,7 +3519,7 @@ function LogPastWorkout({ initial, close }) {
+   const options = [
+     { value: '', label: t('Freestyle') },
+     ...(planned.length > 1 ? [{ value: PLANNED_DAY, label: deriveSessionName(planned.map(r => r.name)) }] : []),
+-    ...st.routines.map(r => ({ value: r.id, label: r.name })),
++    ...personalRoutines(st.routines).map(r => ({ value: r.id, label: r.name })),
+   ]
+ 
+   const go = replaceId => {
+@@ -3632,7 +3633,7 @@ function AddRoutineToSession({ close }) {
+   return <>
+     <h3>{t('Add routine')}</h3>
+     <div className="list">
+-      {st.routines.map(r => {
++      {personalRoutines(st.routines).map(r => {
+         const already = inSession.has(r.id)
+         const empty = !(r.ex || []).length
+         const disabled = already || empty
+diff --git a/frontend/src/views/Home.jsx b/frontend/src/views/Home.jsx
+index f659dc8..a64a33e 100644
+--- a/frontend/src/views/Home.jsx
++++ b/frontend/src/views/Home.jsx
+@@ -30,11 +30,13 @@ import { WrappedHomeCard } from '../components/WrappedEntry.jsx'
+ import RecoveryHint from '../components/RecoveryHint.jsx'
+ import { ChallengesCard } from '../components/Challenges.jsx'
+ import { isOn } from '../lib/modules.js'
++import { personalRoutines } from '../lib/routines.js'
+ 
+ // Home = what to do now + a quick glance. Deep charts & history live in Stats.
+ export default function Home() {
+   const nav = useNavigate()
+   const S = useStore(s => s.S)
++  const myRoutines = personalRoutines(S.routines)
+   const user = useStore(s => s.user)
+   // The banner switched off and the sync stuck: a dot on the gear (Settings → Show connection status).
+   const trouble = useConnectionTrouble()
+@@ -217,11 +219,11 @@ export default function Home() {
+ 
+     <div className="card tap-host">
+       <CardHead icon="person" tint="var(--blue)" eyebrow="PERSONAL TRAINER"
+-        title="Alunos e meus treinos" sub={`${(S.coachStudents || []).length} alunos · ${S.routines.length} rotinas`}
++        title="Alunos e meus treinos" sub={`${(S.coachStudents || []).length} alunos · ${myRoutines.length} rotinas`}
+         open={{ onClick: () => nav('/personal') }} action={<Icon name="chevronRight" className="chev" />} />
+     </div>
+ 
+-    {!S.routines.length && !S.active && (
++    {!myRoutines.length && !S.active && (
+       <div className="card">
+         <CardHead icon="calendar" title={t('Welcome!')} sub={t('Set up your weekly routine to get going, or grab a ready-made starter plan.')} />
+         <Button variant="primary" icon="clipboard" onClick={starterPlanSheet}>{t('Load starter plan')}</Button>
+diff --git a/frontend/src/views/PersonalWorkspace.jsx b/frontend/src/views/PersonalWorkspace.jsx
+index 8900d2a..dc2d987 100644
+--- a/frontend/src/views/PersonalWorkspace.jsx
++++ b/frontend/src/views/PersonalWorkspace.jsx
+@@ -1,42 +1,164 @@
+-import { useState } from 'react'
++import { useEffect, useState } from 'react'
+ import { useNavigate } from 'react-router-dom'
+ import { useStore } from '../store/useStore.js'
+ import { useUI } from '../store/useUI.js'
+-import { uid } from '../lib/format.js'
++import { uid, todayISO, isoOf, weekKey, weekStartOf } from '../lib/format.js'
+ import Icon from '../components/Icon.jsx'
+ import CardHead from '../components/CardHead.jsx'
+ import EmptyState from '../components/EmptyState.jsx'
+ import { Button, Segmented, TextArea, TextField } from '../components/ui.jsx'
+ import { esc, printDocument } from '../lib/print-doc.js'
++import { copyRoutine, personalRoutines as getPersonalRoutines } from '../lib/routines.js'
++import { confirmSheet } from '../sheets.jsx'
+ 
+ const update = fn => useStore.getState().update(fn)
+ const openSheet = (student = null) => useUI.getState().openSheet(close => <StudentSheet close={close} student={student} />)
++const safeIdPart = value => String(value).replace(/[^a-zA-Z0-9]/g, char => `_${char.codePointAt(0).toString(16)}_`)
++const studentRoutineId = (studentId, sourceId) => `coach-${safeIdPart(studentId)}-${safeIdPart(sourceId)}`
++const studentRoutineName = (routine, student) => `${routine.name || 'Treino'} · ${student.name}`
++const validISODate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
++  && isoOf(new Date(`${value}T12:00:00`)) === value
++const routineIsScheduled = (S, routineId) => {
++  const inWeek = Object.values(S.week || {}).some(ids => [].concat(ids || []).includes(routineId))
++  const inDayPlan = Object.values(S.dayPlan || {}).includes(routineId)
++  const inRotation = (S.rotation?.sequence || []).includes(routineId)
++  const inQueue = (S.queue?.ids || []).includes(routineId)
++  return inWeek || inDayPlan || inRotation || inQueue
++}
++
++function hasLegacyStudentAssignments(S) {
++  const byId = new Map((S.routines || []).map(routine => [routine.id, routine]))
++  return (S.coachStudents || []).some(student => (student.routineIds || []).some(id => {
++    const routine = byId.get(id)
++    return routine && (routine.coachStudentId !== student.id || routine.coachArchived)
++  }))
++}
++
++function migrateStudentAssignments(S) {
++  const byId = new Map((S.routines || []).map(routine => [routine.id, routine]))
++  let migrated = 0
++  for (const student of S.coachStudents || []) {
++    const ids = Array.isArray(student.routineIds) ? student.routineIds : []
++    const nextIds = []
++    for (const id of ids) {
++      const assigned = byId.get(id)
++      if (!assigned) { nextIds.push(id); continue }
++      if (assigned.coachStudentId === student.id) {
++        if (assigned.coachArchived) { assigned.coachArchived = false; assigned._ts = Date.now(); migrated++ }
++        nextIds.push(id)
++        continue
++      }
++      const source = assigned.coachSourceRoutineId ? byId.get(assigned.coachSourceRoutineId) || assigned : assigned
++      const copyId = studentRoutineId(student.id, source.id)
++      let copy = byId.get(copyId)
++      if (!copy) {
++        copy = copyRoutine(source)
++        copy.id = copyId
++        copy.name = studentRoutineName(source, student)
++        copy.coachStudentId = student.id
++        copy.coachSourceRoutineId = source.id
++        copy.coachArchived = false
++        copy._ts = Date.now()
++        S.routines.push(copy)
++        byId.set(copyId, copy)
++      }
++      nextIds.push(copyId)
++      migrated++
++    }
++    const uniqueIds = [...new Set(nextIds)]
++    if (uniqueIds.length !== ids.length || uniqueIds.some((id, index) => id !== ids[index])) {
++      student.routineIds = uniqueIds
++      student._ts = Date.now()
++    }
++  }
++  return migrated
++}
+ 
+ export default function PersonalWorkspace() {
+   const nav = useNavigate()
+   const S = useStore(s => s.S)
+   const students = S.coachStudents || []
+   const sessions = S.coachSessions || []
+-  const measurements = (S.coachMeasurements || []).filter(m => m.studentId === selectedId).sort((a, b) => (b.at || 0) - (a.at || 0))
+-  const routines = S.routines || []
+   const [tab, setTab] = useState('dashboard')
+   const [selectedId, setSelected] = useState(null)
++  const measurements = (S.coachMeasurements || []).filter(m => m.studentId === selectedId).sort((a, b) => (b.at || 0) - (a.at || 0))
++  const routines = S.routines || []
++  const personalRoutines = getPersonalRoutines(routines)
+   const selected = students.find(s => s.id === selectedId) || null
++  const selectedRoutines = selected ? routines.filter(r => (selected.routineIds || []).includes(r.id)) : []
++  const assignedSourceIds = new Set(selectedRoutines.map(routine => routine.coachSourceRoutineId || routine.id))
++  const availableRoutines = personalRoutines.filter(routine => !assignedSourceIds.has(routine.id))
++  const selectedSessions = selected ? sessions.filter(session => session.studentId === selected.id).sort((a, b) => (b.at || 0) - (a.at || 0)) : []
+   const [query, setQuery] = useState('')
+-  const visible = students.filter(s => `${s.name} ${s.goal || ''}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')))
++  const [studentFilter, setStudentFilter] = useState('all')
++  const visible = students.filter(student => {
++    const matchesQuery = `${student.name} ${student.goal || ''}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))
++    const hasRoutine = (student.routineIds || []).some(id => routines.some(routine => routine.id === id))
++    return matchesQuery && (studentFilter === 'all' || (studentFilter === 'assigned' ? hasRoutine : !hasRoutine))
++  })
+   const assignedCount = students.reduce((n, student) => n + (student.routineIds || []).filter(id => routines.some(r => r.id === id)).length, 0)
+   const pendingStudents = students.filter(student => !(student.routineIds || []).some(id => routines.some(r => r.id === id)))
++  const today = todayISO()
++  const reviewCutoff = (() => { const date = new Date(); date.setDate(date.getDate() + 7); return isoOf(date) })()
++  const reviewActions = students
++    .filter(student => validISODate(student.nextReviewDate) && student.nextReviewDate <= reviewCutoff)
++    .sort((a, b) => a.nextReviewDate.localeCompare(b.nextReviewDate))
++    .map(student => ({ student, type: student.nextReviewDate < today ? 'overdue' : 'review' }))
++  const followUpActions = [
++    ...reviewActions,
++    ...pendingStudents.map(student => ({ student, type: 'plan' })),
++  ]
++  const studentsForRoutine = routineId => students.filter(student => (student.routineIds || []).some(id => {
++    const assigned = routines.find(routine => routine.id === id)
++    return id === routineId || assigned?.coachSourceRoutineId === routineId
++  }))
+   const recentSessions = [...sessions].sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 5)
++  const currentWeek = weekKey(todayISO(), weekStartOf(S))
++  const sessionsThisWeek = sessions.filter(session => {
++    const at = Number(session.at)
++    return Number.isFinite(at) && at > 0 && weekKey(isoOf(new Date(at)), weekStartOf(S)) === currentWeek
++  })
++
++  useEffect(() => {
++    if (!hasLegacyStudentAssignments(useStore.getState().S)) return
++    let migrated = 0
++    update(s => { migrated = migrateStudentAssignments(s) })
++    if (migrated) useUI.getState().toast(`${migrated} atribuição(ões) convertida(s) em treinos independentes por aluno.`)
++  }, [])
+ 
+   const assign = (studentId, routineId) => update(s => {
+     const student = (s.coachStudents || []).find(x => x.id === studentId)
+-    if (!student) return
+-    student.routineIds = [...new Set([...(student.routineIds || []), routineId])]
++    const source = (s.routines || []).find(routine => routine.id === routineId)
++    if (!student || !source || source.coachStudentId || (student.routineIds || []).some(id => id === source.id || s.routines.find(routine => routine.id === id)?.coachSourceRoutineId === source.id)) return
++    const copyId = studentRoutineId(student.id, source.id)
++    let copy = s.routines.find(routine => routine.id === copyId)
++    if (!copy) {
++      copy = copyRoutine(source)
++      copy.id = copyId
++      copy.name = studentRoutineName(source, student)
++      copy.coachStudentId = student.id
++      copy.coachSourceRoutineId = source.id
++      s.routines.push(copy)
++    }
++    copy.coachArchived = false
++    copy._ts = Date.now()
++    student.routineIds = [...new Set([...(student.routineIds || []), copy.id])]
+     student._ts = Date.now()
+   })
+   const removePlan = (studentId, routineId) => update(s => {
+     const student = (s.coachStudents || []).find(x => x.id === studentId)
+-    if (student) { student.routineIds = (student.routineIds || []).filter(x => x !== routineId); student._ts = Date.now() }
++    if (!student) return
++    student.routineIds = (student.routineIds || []).filter(x => x !== routineId)
++    student._ts = Date.now()
++    const routine = (s.routines || []).find(item => item.id === routineId)
++    if (routine?.coachStudentId === studentId) {
++      const hasHistory = (s.coachSessions || []).some(session => session.routineId === routineId)
++        || (s.workouts || []).some(workout => workout.routineId === routineId || (workout.routineIds || []).includes(routineId))
++        || s.active?.routineId === routineId || (s.active?.routineIds || []).includes(routineId)
++        || routineIsScheduled(s, routineId)
++      if (hasHistory) { routine.coachArchived = true; routine._ts = Date.now() }
++      else s.routines = s.routines.filter(item => item.id !== routineId)
++    }
+   })
+ 
+   return <div className="narrow">
+@@ -53,15 +175,15 @@ export default function PersonalWorkspace() {
+         <CardHead icon="chart" tint="var(--blue)" eyebrow="ACOMPANHAMENTO" title="Visão geral" sub="Resumo dos alunos, prescrições e sessões registradas." />
+         <div className="grid" style={{ gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10, marginTop: 16 }}>
+           <Metric icon="person" label="Alunos" value={students.length} onClick={() => setTab('students')} />
+-          <Metric icon="dumbbell" label="Meus treinos" value={routines.length} onClick={() => setTab('workouts')} />
++          <Metric icon="dumbbell" label="Meus treinos" value={personalRoutines.length} onClick={() => setTab('workouts')} />
+           <Metric icon="clipboard" label="Treinos atribuídos" value={assignedCount} onClick={() => setTab('students')} />
+-          <Metric icon="checkCircle" label="Sessões concluídas" value={sessions.length} onClick={() => setTab('students')} />
++          <Metric icon="checkCircle" label="Sessões esta semana" value={sessionsThisWeek.length} onClick={() => setTab('students')} />
+         </div>
+       </div>
+       <div className="card">
+-        <CardHead icon="bolt" title="Próximas ações" sub={pendingStudents.length ? `${pendingStudents.length} aluno(s) sem treino atribuído` : 'Todos os alunos têm treinos atribuídos.'} />
+-        {pendingStudents.slice(0, 4).map(student => <div key={student.id} className="row" style={{ justifyContent: 'space-between', gap: 12, padding: '12px 0', borderTop: '1px solid var(--separator)' }}>
+-          <button className="grow" style={{ textAlign: 'left', background: 'none', color: 'inherit', border: 0 }} onClick={() => { setSelected(student.id); setTab('students') }}><strong>{student.name}</strong><span className="small muted" style={{ display: 'block' }}>{student.goal || 'Objetivo não informado'}</span></button>
++        <CardHead icon="bolt" title="Próximas ações" sub={followUpActions.length ? `${followUpActions.length} acompanhamento(s) necessário(s)` : 'Nenhuma ação pendente.'} />
++        {followUpActions.slice(0, 6).map(({ student, type }) => <div key={`${student.id}-${type}`} className="row" style={{ justifyContent: 'space-between', gap: 12, padding: '12px 0', borderTop: '1px solid var(--separator)' }}>
++          <button className="grow" style={{ textAlign: 'left', background: 'none', color: 'inherit', border: 0 }} onClick={() => { setSelected(student.id); setTab('students') }}><strong>{student.name}</strong><span className="small muted" style={{ display: 'block' }}>{type === 'plan' ? 'Sem treino atribuído' : `${type === 'overdue' ? 'Reavaliação atrasada' : 'Reavaliação nesta semana'} · ${new Date(`${student.nextReviewDate}T12:00:00`).toLocaleDateString('pt-BR')}`}</span></button>
+           <Button size="sm" onClick={() => { setSelected(student.id); setTab('students') }}>Acompanhar</Button>
+         </div>)}
+         {students.length === 0 && <Button variant="primary" icon="plus" onClick={() => { setTab('students'); openSheet() }}>Cadastrar primeiro aluno</Button>}
+@@ -82,23 +204,38 @@ export default function PersonalWorkspace() {
+           <CardHead icon="person" eyebrow="ALUNO" title={selected.name} sub={selected.goal || 'Objetivo não informado'}
+             action={<Button size="sm" variant="ghost" icon="chevronLeft" onClick={() => setSelected(null)}>Voltar</Button>} />
+           {selected.email && <div className="row small muted" style={{ gap: 8, marginTop: 14 }}><Icon name="envelope" />{selected.email}</div>}
++          <div className="row small muted" style={{ gap: 8, marginTop: 12 }}><Icon name="calendar" />{validISODate(selected.nextReviewDate) ? `Próxima avaliação: ${new Date(`${selected.nextReviewDate}T12:00:00`).toLocaleDateString('pt-BR')}` : 'Reavaliação não agendada'}</div>
+           {selected.notes && <p className="small" style={{ whiteSpace: 'pre-wrap', margin: '14px 0 0' }}>{selected.notes}</p>}
+           <div className="row" style={{ gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+             <Button size="sm" icon="pencil" onClick={() => openSheet(selected)}>Editar aluno</Button>
+             <Button size="sm" icon="plus" onClick={() => useUI.getState().openSheet(close => <MeasurementSheet close={close} student={selected} />)}>Registrar evolução</Button>
+-            {routines.some(r => (selected.routineIds || []).includes(r.id)) && <Button size="sm" variant="primary" icon="check" onClick={() => useUI.getState().openSheet(close => <SessionSheet close={close} student={selected} routine={routines.find(r => (selected.routineIds || []).includes(r.id))} />)}>Registrar sessão</Button>}
+-            <Button size="sm" variant="ghost" icon="trash" onClick={() => {
+-              update(s => {
+-                s.coachStudents = (s.coachStudents || []).filter(x => x.id !== selected.id)
+-                s.coachSessions = (s.coachSessions || []).filter(x => x.studentId !== selected.id)
+-                s.coachMeasurements = (s.coachMeasurements || []).filter(x => x.studentId !== selected.id)
+-              })
+-              setSelected(null)
+-            }}>Excluir</Button>
++            {selectedRoutines.length > 0 && <Button size="sm" variant="primary" icon="check" onClick={() => selectedRoutines.length === 1
++              ? useUI.getState().openSheet(close => <SessionSheet close={close} student={selected} routine={selectedRoutines[0]} />)
++              : useUI.getState().openSheet(close => <SessionRoutineSheet close={close} student={selected} routines={selectedRoutines} />)}>Registrar sessão</Button>}
++            <Button size="sm" variant="ghost" icon="trash" onClick={() => confirmSheet({
++              title: `Excluir ${selected.name}?`,
++              message: 'O cadastro, as sessões e as medidas corporais deste aluno serão excluídos. As rotinas da sua biblioteca serão mantidas. Esta ação não pode ser desfeita.',
++              confirmText: 'Excluir aluno', cancelText: 'Cancelar', danger: true,
++              onConfirm: () => {
++                update(s => {
++                  const ownedRoutineIds = new Set((s.routines || []).filter(routine => routine.coachStudentId === selected.id).map(routine => routine.id))
++                  const usedRoutineIds = new Set((s.workouts || []).flatMap(workout => [workout.routineId, ...(workout.routineIds || [])]).filter(id => ownedRoutineIds.has(id)))
++                  if (s.active?.routineId && ownedRoutineIds.has(s.active.routineId)) usedRoutineIds.add(s.active.routineId)
++                  for (const id of s.active?.routineIds || []) if (ownedRoutineIds.has(id)) usedRoutineIds.add(id)
++                  for (const id of ownedRoutineIds) if (routineIsScheduled(s, id)) usedRoutineIds.add(id)
++                  for (const routine of s.routines || []) if (usedRoutineIds.has(routine.id)) { routine.coachArchived = true; routine._ts = Date.now() }
++                  s.routines = (s.routines || []).filter(routine => !ownedRoutineIds.has(routine.id) || usedRoutineIds.has(routine.id))
++                  s.coachStudents = (s.coachStudents || []).filter(x => x.id !== selected.id)
++                  s.coachSessions = (s.coachSessions || []).filter(x => x.studentId !== selected.id)
++                  s.coachMeasurements = (s.coachMeasurements || []).filter(x => x.studentId !== selected.id)
++                })
++                setSelected(null)
++              },
++            })}>Excluir</Button>
+           </div>
+         </div>
+         <div className="card">
+-          <CardHead icon="calendar" title="Treinos atribuídos" sub="Rotinas da sua biblioteca" />
++          <CardHead icon="calendar" title="Treinos atribuídos" sub="Cada aluno recebe uma cópia independente da rotina." />
+           {(selected.routineIds || []).map(id => {
+             const routine = routines.find(r => r.id === id)
+             if (!routine) return null
+@@ -106,61 +243,87 @@ export default function PersonalWorkspace() {
+               <button className="grow" style={{ textAlign: 'left', background: 'none', color: 'inherit', border: 0 }} onClick={() => nav(`/plan/r/${id}`)}>
+                 <strong>{routine.name}</strong><div className="small muted">{routine.ex?.length || 0} exercícios</div>
+               </button>
+-              <Button size="sm" variant="ghost" icon="xmark" aria-label="Remover treino" onClick={() => removePlan(selected.id, id)} />
++              <Button size="sm" variant="ghost" icon="xmark" aria-label="Remover treino" onClick={() => confirmSheet({
++                title: `Remover ${routine.name}?`,
++                message: `A rotina será desatribuída de ${selected.name}. O treino continuará na sua biblioteca e poderá ser atribuído novamente.`,
++                confirmText: 'Remover treino', cancelText: 'Cancelar', danger: true,
++                onConfirm: () => removePlan(selected.id, id),
++              })} />
+             </div>
+           })}
+-          <Button icon="plus" onClick={() => useUI.getState().openSheet(close => <AssignSheet close={close} student={selected} routines={routines} assign={assign} />)}>Atribuir treino</Button>
++          <Button icon="plus" onClick={() => useUI.getState().openSheet(close => <AssignSheet close={close} student={selected} routines={availableRoutines} totalRoutines={personalRoutines.length} assign={assign} />)}>Atribuir treino</Button>
+         </div>
+         <div className="card">
+           <CardHead icon="chart" title="Evolução do aluno" sub="Acompanhe medidas corporais ao longo do tempo."
+             action={measurements.length ? <Button size="sm" variant="ghost" icon="download" onClick={() => printEvolution(selected, measurements)}>Exportar PDF</Button> : null} />
+           {measurements.length ? <>
+             <div className="grid" style={{ gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8, margin: '12px 0' }}>
+-              <MeasureMetric label="Peso" value={latest(measurements, 'weight')} unit="kg" />
+-              <MeasureMetric label="Cintura" value={latest(measurements, 'waist')} unit="cm" />
+-              <MeasureMetric label="Quadril" value={latest(measurements, 'hip')} unit="cm" />
+-              <MeasureMetric label="Gordura corporal" value={latest(measurements, 'bodyFat')} unit="%" />
++              <MeasureMetric label="Peso" value={latest(measurements, 'weight')} unit="kg" change={changeFromPrevious(measurements, 'weight')} />
++              <MeasureMetric label="Cintura" value={latest(measurements, 'waist')} unit="cm" change={changeFromPrevious(measurements, 'waist')} />
++              <MeasureMetric label="Quadril" value={latest(measurements, 'hip')} unit="cm" change={changeFromPrevious(measurements, 'hip')} />
++              <MeasureMetric label="Gordura corporal" value={latest(measurements, 'bodyFat')} unit="%" change={changeFromPrevious(measurements, 'bodyFat')} />
+             </div>
+             {[...measurements].reverse().map(record => <div key={record.id} className="row" style={{ justifyContent: 'space-between', gap: 12, padding: '10px 0', borderTop: '1px solid var(--separator)' }}>
+               <span><strong>{new Date(`${record.date}T12:00:00`).toLocaleDateString('pt-BR')}</strong><span className="small muted" style={{ display: 'block' }}>{[
+                 record.weight != null && `${record.weight} kg`, record.waist != null && `cintura ${record.waist} cm`, record.hip != null && `quadril ${record.hip} cm`, record.bodyFat != null && `${record.bodyFat}% gordura`,
+               ].filter(Boolean).join(' · ')}</span>{record.note && <span className="small" style={{ display: 'block', marginTop: 4 }}>{record.note}</span>}</span>
+-              <Button size="sm" variant="ghost" icon="trash" aria-label="Excluir registro" onClick={() => update(s => { s.coachMeasurements = (s.coachMeasurements || []).filter(x => x.id !== record.id) })} />
++              <Button size="sm" variant="ghost" icon="trash" aria-label="Excluir registro" onClick={() => confirmSheet({
++                title: 'Excluir registro de evolução?',
++                message: `As medidas de ${new Date(`${record.date}T12:00:00`).toLocaleDateString('pt-BR')} serão removidas. Esta ação não pode ser desfeita.`,
++                confirmText: 'Excluir registro', cancelText: 'Cancelar', danger: true,
++                onConfirm: () => update(s => { s.coachMeasurements = (s.coachMeasurements || []).filter(x => x.id !== record.id) }),
++              })} />
+             </div>)}
+           </> : <EmptyState icon="chart" title="Sem medidas registradas" text="Adicione peso e medidas para acompanhar a evolução deste aluno." />}
+           <Button icon="plus" onClick={() => useUI.getState().openSheet(close => <MeasurementSheet close={close} student={selected} />)}>Adicionar medidas</Button>
+         </div>
+         <div className="card">
+-          <CardHead icon="clock" title="Histórico de sessões" />
+-          {sessions.filter(x => x.studentId === selected.id).sort((a, b) => (b.at || 0) - (a.at || 0)).map(session => {
++          <CardHead icon="clock" title="Histórico de sessões" action={selectedSessions.length ? <Button size="sm" variant="ghost" icon="download" onClick={() => printSessions(selected, selectedSessions, routines)}>Exportar PDF</Button> : null} />
++          {selectedSessions.map(session => {
+             const routine = routines.find(r => r.id === session.routineId)
+             return <div key={session.id} className="row" style={{ justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid var(--separator)' }}>
+-              <span><strong>{routine?.name || 'Treino'}</strong><span className="small muted" style={{ display: 'block' }}>{new Date(session.at).toLocaleDateString('pt-BR')} · esforço {session.effort}/5</span>{session.feedback && <span className="small" style={{ display: 'block', marginTop: 4 }}>{session.feedback}</span>}</span>
++              <span className="grow"><strong>{routine?.name || 'Treino'}</strong><span className="small muted" style={{ display: 'block' }}>{new Date(session.at).toLocaleDateString('pt-BR')} · esforço {session.effort}/5</span>{session.feedback && <span className="small" style={{ display: 'block', marginTop: 4 }}>{session.feedback}</span>}</span>
++              <div className="row" style={{ gap: 4 }}>
++                <Button size="sm" variant="ghost" icon="pencil" aria-label="Editar sessão" onClick={() => useUI.getState().openSheet(close => <SessionSheet close={close} student={selected} routine={routine} session={session} />)} />
++                <Button size="sm" variant="ghost" icon="trash" aria-label="Excluir sessão" onClick={() => confirmSheet({
++                  title: 'Excluir registro de sessão?',
++                  message: 'Este registro de acompanhamento será removido. A rotina e as sessões registradas no histórico principal do OpenGym não serão alteradas.',
++                  confirmText: 'Excluir sessão', cancelText: 'Cancelar', danger: true,
++                  onConfirm: () => update(s => { s.coachSessions = (s.coachSessions || []).filter(item => item.id !== session.id) }),
++                })} />
++              </div>
+             </div>
+           })}
+-          {!sessions.some(x => x.studentId === selected.id) && <div className="small muted">Ainda não há sessões para este aluno.</div>}
++          {!selectedSessions.length && <div className="small muted">Ainda não há sessões para este aluno.</div>}
+         </div>
+       </> : <>
+         <div className="card">
+           <CardHead icon="person" tint="var(--blue)" eyebrow="ACOMPANHAMENTO" title={`${students.length} ${students.length === 1 ? 'aluno' : 'alunos'}`}
+             action={<Button size="sm" variant="primary" icon="plus" onClick={() => openSheet()}>Novo aluno</Button>} />
++          {students.length > 0 && <Segmented value={studentFilter} onChange={setStudentFilter} options={[
++            { value: 'all', label: 'Todos' }, { value: 'assigned', label: 'Com treino' }, { value: 'pending', label: 'Sem treino' },
++          ]} />}
+           {students.length > 0 && <TextField value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar aluno" style={{ marginTop: 14 }} />}
+         </div>
+-        {visible.length ? visible.map(student => <button key={student.id} className="card tap-host" style={{ width: '100%', textAlign: 'left', color: 'inherit' }} onClick={() => setSelected(student.id)}>
+-          <div className="row" style={{ gap: 12 }}><span className="lrow-i"><Icon name="person" /></span><span className="grow"><strong>{student.name}</strong><span className="small muted" style={{ display: 'block', marginTop: 4 }}>{student.goal || 'Objetivo não informado'} · {(student.routineIds || []).length} treinos</span></span><Icon name="chevronRight" className="chev" /></div>
+-        </button>) : <EmptyState icon="person" title={query ? 'Nenhum aluno encontrado' : 'Sua lista de alunos começa aqui'} text={query ? 'Tente outro nome.' : 'Cadastre seus alunos e organize os treinos de cada um.'}>
+-          {!query && <Button variant="primary" icon="plus" onClick={() => openSheet()}>Cadastrar aluno</Button>}
++        {visible.length ? visible.map(student => {
++          const lastSession = sessions.filter(session => session.studentId === student.id).sort((a, b) => (b.at || 0) - (a.at || 0))[0]
++          return <button key={student.id} className="card tap-host" style={{ width: '100%', textAlign: 'left', color: 'inherit' }} onClick={() => setSelected(student.id)}>
++            <div className="row" style={{ gap: 12 }}><span className="lrow-i"><Icon name="person" /></span><span className="grow"><strong>{student.name}</strong><span className="small muted" style={{ display: 'block', marginTop: 4 }}>{student.goal || 'Objetivo não informado'} · {(student.routineIds || []).length} treinos</span><span className="small muted" style={{ display: 'block', marginTop: 3 }}>{lastSession?.at ? `Última sessão: ${new Date(lastSession.at).toLocaleDateString('pt-BR')}` : 'Nenhuma sessão registrada'}</span></span><Icon name="chevronRight" className="chev" /></div>
++          </button>
++        }) : <EmptyState icon="person" title={students.length ? 'Nenhum aluno encontrado' : 'Sua lista de alunos começa aqui'} text={students.length ? 'Altere a busca ou o filtro para ver outros alunos.' : 'Cadastre seus alunos e organize os treinos de cada um.'}>
++          {!students.length && <Button variant="primary" icon="plus" onClick={() => openSheet()}>Cadastrar aluno</Button>}
++          {students.length > 0 && (query || studentFilter !== 'all') && <Button variant="ghost" onClick={() => { setQuery(''); setStudentFilter('all') }}>Limpar filtros</Button>}
+         </EmptyState>}
+       </>}
+     </> : <>
+       <div className="card">
+-        <CardHead icon="dumbbell" tint="var(--teal)" eyebrow="BIBLIOTECA DE TREINOS" title={`${routines.length} ${routines.length === 1 ? 'rotina' : 'rotinas'}`} sub="Crie suas rotinas e atribua aos alunos." />
++        <CardHead icon="dumbbell" tint="var(--teal)" eyebrow="BIBLIOTECA DE TREINOS" title={`${personalRoutines.length} ${personalRoutines.length === 1 ? 'rotina' : 'rotinas'}`} sub="Crie suas rotinas e atribua aos alunos." />
+         <Button variant="primary" icon="plus" onClick={() => nav('/plan')}>Criar ou editar treinos</Button>
+       </div>
+-      {routines.length ? routines.map(r => <div className="card" key={r.id}>
+-        <CardHead icon="calendar" title={r.name} sub={`${r.ex?.length || 0} exercícios · ${students.filter(student => (student.routineIds || []).includes(r.id)).length} alunos`} action={<Button size="sm" variant="ghost" icon="chevronRight" onClick={() => nav(`/plan/r/${r.id}`)}>Abrir</Button>} />
+-        {!!students.filter(student => (student.routineIds || []).includes(r.id)).length && <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+-          {students.filter(student => (student.routineIds || []).includes(r.id)).map(student => <button key={student.id} className="tag" onClick={() => { setSelected(student.id); setTab('students') }}>{student.name}</button>)}
++      {personalRoutines.length ? personalRoutines.map(r => <div className="card" key={r.id}>
++        <CardHead icon="calendar" title={r.name} sub={`${r.ex?.length || 0} exercícios · ${studentsForRoutine(r.id).length} alunos`} action={<Button size="sm" variant="ghost" icon="chevronRight" onClick={() => nav(`/plan/r/${r.id}`)}>Abrir</Button>} />
++        {!!studentsForRoutine(r.id).length && <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
++          {studentsForRoutine(r.id).map(student => <button key={student.id} className="tag" onClick={() => { setSelected(student.id); setTab('students') }}>{student.name}</button>)}
+         </div>}
+         {(r.ex || []).slice(0, 4).map((e, i) => <div className="small muted" key={`${e.id}-${i}`} style={{ paddingTop: 8 }}>{e.name || e.n || e.id}</div>)}
+       </div>) : <EmptyState icon="dumbbell" title="Nenhum treino criado" text="Monte uma rotina na tela Plan. Depois, você poderá atribuí-la a um aluno."><Button variant="primary" onClick={() => nav('/plan')}>Abrir Plan</Button></EmptyState>}
+@@ -180,8 +343,15 @@ function latest(records, field) {
+   return value == null ? '—' : value
+ }
+ 
+-function MeasureMetric({ label, value, unit }) {
+-  return <div className="card" style={{ margin: 0, padding: 12 }}><span className="small muted">{label}</span><div style={{ fontSize: 21, fontWeight: 650, marginTop: 4 }}>{value}<span className="small muted" style={{ marginLeft: 4 }}>{value === '—' ? '' : unit}</span></div></div>
++function changeFromPrevious(records, field) {
++  const values = records.filter(record => record[field] != null && Number.isFinite(Number(record[field]))).slice(0, 2)
++  if (values.length < 2) return null
++  return Math.round((Number(values[0][field]) - Number(values[1][field])) * 10) / 10
++}
++
++function MeasureMetric({ label, value, unit, change }) {
++  const changeText = change == null ? '' : `${change > 0 ? '+' : ''}${change.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} ${unit} vs. anterior`
++  return <div className="card" style={{ margin: 0, padding: 12 }}><span className="small muted">{label}</span><div style={{ fontSize: 21, fontWeight: 650, marginTop: 4 }}>{value}<span className="small muted" style={{ marginLeft: 4 }}>{value === '—' ? '' : unit}</span></div>{changeText && <span className="small muted" style={{ display: 'block', marginTop: 4 }}>{changeText}</span>}</div>
+ }
+ 
+ function MeasurementSheet({ close, student }) {
+@@ -223,39 +393,73 @@ function printEvolution(student, records) {
+   printDocument(html, `OpenGym - Evolução - ${student.name}`)
+ }
+ 
+-function SessionSheet({ close, student, routine }) {
+-  const [effort, setEffort] = useState(3)
+-  const [feedback, setFeedback] = useState('')
++function printSessions(student, records, routines) {
++  const rows = [...records].reverse().map(session => {
++    const routine = routines.find(item => item.id === session.routineId)
++    const at = Number(session.at)
++    const date = Number.isFinite(at) && at > 0 ? new Date(at).toLocaleDateString('pt-BR') : '—'
++    const effort = Number.isFinite(Number(session.effort)) ? `${Number(session.effort)}/5` : '—'
++    return `<tr><td>${esc(date)}</td><td>${esc(routine?.name || 'Treino')}</td><td>${esc(effort)}</td><td>${esc(session.feedback || '—')}</td></tr>`
++  }).join('')
++  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Sessões - ${esc(student.name)}</title><style>@page{size:auto;margin:16mm}*{box-sizing:border-box}body{font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;color:#17191f;margin:0}.head{border-bottom:3px solid #a3e635;padding-bottom:14px;margin-bottom:24px}.brand{font-size:12px;font-weight:700;letter-spacing:.12em;color:#667085;text-transform:uppercase}.brand i{display:inline-block;width:10px;height:10px;background:#a3e635;border-radius:50%;margin-right:8px}h1{font-size:26px;margin:12px 0 2px}.muted{color:#667085}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{text-align:left;vertical-align:top;padding:9px 6px;border-bottom:1px solid #e5e7eb}th{font-size:11px;text-transform:uppercase;color:#667085}@media print{tr{break-inside:avoid}}</style></head><body><header class="head"><div class="brand"><i></i>OpenGym · Acompanhamento</div><h1>Sessões de ${esc(student.name)}</h1><div class="muted">${esc(student.goal || 'Objetivo não informado')} · Relatório gerado em ${new Date().toLocaleDateString('pt-BR')}</div></header><table><thead><tr><th>Data</th><th>Treino</th><th>Esforço</th><th>Feedback</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
++  printDocument(html, `OpenGym - Sessões - ${student.name}`)
++}
++
++function SessionSheet({ close, student, routine, session }) {
++  const [effort, setEffort] = useState(session?.effort || 3)
++  const [feedback, setFeedback] = useState(session?.feedback || '')
+   const save = () => {
+     update(s => {
+       if (!Array.isArray(s.coachSessions)) s.coachSessions = []
+-      s.coachSessions.push({ id: uid(), studentId: student.id, routineId: routine?.id || null, at: Date.now(), effort, feedback: feedback.trim(), _ts: Date.now() })
++      const now = Date.now()
++      const existing = session && s.coachSessions.find(item => item.id === session.id)
++      if (existing) Object.assign(existing, { effort, feedback: feedback.trim(), _ts: now })
++      else s.coachSessions.push({ id: uid(), studentId: student.id, routineId: routine?.id || null, at: now, effort, feedback: feedback.trim(), _ts: now })
+     })
+     close()
+   }
+   return <div className="sheet-content">
+-    <h3>Registrar sessão</h3><p className="muted small">{student.name}{routine ? ` · ${routine.name}` : ''}</p>
++    <h3>{session ? 'Editar sessão' : 'Registrar sessão'}</h3><p className="muted small">{student.name}{routine ? ` · ${routine.name}` : ''}</p>
+     <label className="lbl2" style={{ display: 'block', marginBottom: 8 }}>Esforço percebido</label>
+     <Segmented value={effort} onChange={setEffort} options={[1, 2, 3, 4, 5].map(value => ({ value, label: String(value) }))} />
+     <label className="lbl2" style={{ display: 'block', marginTop: 16 }}>Feedback ou observações</label>
+     <TextArea rows={4} value={feedback} onChange={e => setFeedback(e.target.value)} placeholder="Como foi o treino?" />
+-    <div className="row" style={{ gap: 8, marginTop: 18 }}><Button variant="ghost" onClick={close}>Cancelar</Button><Button variant="primary" icon="check" onClick={save}>Salvar sessão</Button></div>
++    <div className="row" style={{ gap: 8, marginTop: 18 }}><Button variant="ghost" onClick={close}>Cancelar</Button><Button variant="primary" icon="check" onClick={save}>{session ? 'Salvar alterações' : 'Salvar sessão'}</Button></div>
++  </div>
++}
++
++function SessionRoutineSheet({ close, student, routines }) {
++  return <div className="sheet-content">
++    <h3>Escolher treino</h3><p className="muted small">Qual treino {student.name} concluiu?</p>
++    {routines.map(routine => <button className="card" style={{ width: '100%', textAlign: 'left', color: 'inherit' }} key={routine.id} onClick={() => {
++      close()
++      useUI.getState().openSheet(nextClose => <SessionSheet close={nextClose} student={student} routine={routine} />)
++    }}>
++      <div className="row" style={{ gap: 12 }}><Icon name="dumbbell" /><span className="grow"><strong>{routine.name}</strong><span className="small muted" style={{ display: 'block' }}>{routine.ex?.length || 0} exercícios</span></span><Icon name="chevronRight" /></div>
++    </button>)}
++    <Button variant="ghost" onClick={close}>Cancelar</Button>
+   </div>
+ }
+ 
+ function StudentSheet({ close, student }) {
++  const students = useStore(s => s.S.coachStudents || [])
+   const [name, setName] = useState(student?.name || '')
+   const [goal, setGoal] = useState(student?.goal || '')
+   const [email, setEmail] = useState(student?.email || '')
+   const [notes, setNotes] = useState(student?.notes || '')
++  const [nextReviewDate, setNextReviewDate] = useState(validISODate(student?.nextReviewDate) ? student.nextReviewDate : '')
++  const normalizedEmail = email.trim().toLowerCase()
++  const emailInvalid = !!normalizedEmail && (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail))
++  const emailDuplicate = !!normalizedEmail && students.some(item => item.id !== student?.id && String(item.email || '').trim().toLowerCase() === normalizedEmail)
++  const emailError = emailInvalid ? 'Informe um endereço de e-mail válido.' : emailDuplicate ? 'Este e-mail já está cadastrado em outro aluno.' : ''
+   const save = () => {
+     const clean = name.trim()
+-    if (!clean) return
++    if (!clean || emailError) return
+     update(s => {
+       if (!Array.isArray(s.coachStudents)) s.coachStudents = []
+       const old = student && s.coachStudents.find(x => x.id === student.id)
+-      if (old) Object.assign(old, { name: clean, goal: goal.trim(), email: email.trim(), notes: notes.trim(), _ts: Date.now() })
+-      else s.coachStudents.push({ id: uid(), name: clean, goal: goal.trim(), email: email.trim(), notes: notes.trim(), routineIds: [], _ts: Date.now() })
++      if (old) Object.assign(old, { name: clean, goal: goal.trim(), email: normalizedEmail, notes: notes.trim(), nextReviewDate: nextReviewDate || null, _ts: Date.now() })
++      else s.coachStudents.push({ id: uid(), name: clean, goal: goal.trim(), email: normalizedEmail, notes: notes.trim(), nextReviewDate: nextReviewDate || null, routineIds: [], _ts: Date.now() })
+     })
+     close()
+   }
+@@ -263,16 +467,19 @@ function StudentSheet({ close, student }) {
+     <h3>{student ? 'Editar aluno' : 'Novo aluno'}</h3>
+     <label className="lbl2">Nome</label><TextField autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="Nome completo" />
+     <label className="lbl2" style={{ display: 'block', marginTop: 14 }}>Objetivo</label><TextField value={goal} onChange={e => setGoal(e.target.value)} placeholder="Ex.: força, condicionamento" />
+-    <label className="lbl2" style={{ display: 'block', marginTop: 14 }}>E-mail</label><TextField type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="aluno@email.com" />
++    <label className="lbl2" style={{ display: 'block', marginTop: 14 }}>E-mail</label><TextField type="email" autoComplete="email" inputMode="email" maxLength={254} value={email} onChange={e => setEmail(e.target.value)} placeholder="aluno@email.com" aria-invalid={emailError ? 'true' : undefined} aria-describedby={emailError ? 'student-email-error' : undefined} />
++    {emailError && <div id="student-email-error" className="small" role="alert" style={{ color: 'var(--red)', marginTop: 6 }}>{emailError}</div>}
++    <label className="lbl2" style={{ display: 'block', marginTop: 14 }}>Próxima avaliação</label><TextField type="date" value={nextReviewDate} onChange={e => setNextReviewDate(e.target.value)} />
++    {nextReviewDate && <Button size="sm" variant="ghost" icon="xmark" onClick={() => setNextReviewDate('')}>Remover data</Button>}
+     <label className="lbl2" style={{ display: 'block', marginTop: 14 }}>Observações</label><TextArea rows={4} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Anotações para o acompanhamento" />
+-    <div className="row" style={{ gap: 8, marginTop: 18 }}><Button variant="ghost" onClick={close}>Cancelar</Button><Button variant="primary" disabled={!name.trim()} onClick={save}>{student ? 'Salvar' : 'Cadastrar aluno'}</Button></div>
++    <div className="row" style={{ gap: 8, marginTop: 18 }}><Button variant="ghost" onClick={close}>Cancelar</Button><Button variant="primary" disabled={!name.trim() || !!emailError} onClick={save}>{student ? 'Salvar' : 'Cadastrar aluno'}</Button></div>
+   </div>
+ }
+ 
+-function AssignSheet({ close, student, routines, assign }) {
++function AssignSheet({ close, student, routines, totalRoutines, assign }) {
+   return <div className="sheet-content">
+-    <h3>Atribuir treino</h3><p className="muted small">Selecione uma rotina para {student.name}.</p>
+-    {!routines.length ? <p className="small">Crie uma rotina em Plan antes de atribuir um treino.</p> : routines.map(r => <button className="card" style={{ width: '100%', textAlign: 'left', color: 'inherit' }} key={r.id} onClick={() => { assign(student.id, r.id); close() }}>
++    <h3>Atribuir treino</h3><p className="muted small">Selecione uma rotina para {student.name}. Será criada uma cópia editável só para este aluno.</p>
++    {!routines.length ? <p className="small">{totalRoutines ? 'Todas as suas rotinas já foram atribuídas a este aluno.' : 'Crie uma rotina em Plan antes de atribuir um treino.'}</p> : routines.map(r => <button className="card" style={{ width: '100%', textAlign: 'left', color: 'inherit' }} key={r.id} onClick={() => { assign(student.id, r.id); close() }}>
+       <div className="row" style={{ gap: 12 }}><Icon name="calendar" /><span className="grow"><strong>{r.name}</strong><span className="small muted" style={{ display: 'block' }}>{r.ex?.length || 0} exercícios</span></span><Icon name="plus" /></div>
+     </button>)}
+     <Button variant="ghost" onClick={close}>Fechar</Button>
+diff --git a/frontend/src/views/Plan.jsx b/frontend/src/views/Plan.jsx
+index 5569a6d..ac51cd4 100644
+--- a/frontend/src/views/Plan.jsx
++++ b/frontend/src/views/Plan.jsx
+@@ -13,7 +13,7 @@ import EmptyState from '../components/EmptyState.jsx'
+ import { SeasonDeco } from '../components/Seasonal.jsx'
+ import { Button, Row, Section, Segmented } from '../components/ui.jsx'
+ import SwipeRow from '../components/SwipeRow.jsx'
+-import { copyRoutine, deleteRoutine, restoreRoutine, routineSnapshot } from '../lib/routines.js'
++import { copyRoutine, deleteRoutine, restoreRoutine, routineSnapshot, personalRoutines } from '../lib/routines.js'
+ import MiniBodyMap from '../components/MiniBodyMap.jsx'
+ import { workoutControls } from '../lib/workout-controls.js'
+ import { tappable } from '../lib/use-sheet-keyboard.js'
+@@ -197,6 +197,7 @@ export default function Plan() {
+ /* ================================ Schedule ================================ */
+ 
+ function Schedule({ S, update, nav, mode }) {
++  const myRoutines = personalRoutines(S.routines)
+   const [editLoop, setEditLoop] = useState(false)
+   /* The rotation editor. What it shows is the live pass when there is one, otherwise the saved
+      sequence — S.rotation is only a definition, so the pass is the truth whenever it exists.
+@@ -255,7 +256,7 @@ function Schedule({ S, update, nav, mode }) {
+     title: t('Add to the rotation'),
+     items: [
+       ...(seq.length ? [{ icon: 'moon', label: t('Rest day'), sub: t('A day off before the next one'), onClick: () => setSeq([...seq, REST]) }] : []),
+-      ...S.routines.map(r => ({
++      ...myRoutines.map(r => ({
+         icon: glyphOf(r.emoji), label: r.name, sub: seq.includes(r.id) ? t('Already in the loop: adds it again') : undefined, onClick: () => setSeq([...seq, r.id]),
+       })),
+     ],
+@@ -318,7 +319,7 @@ function Schedule({ S, update, nav, mode }) {
+       <SeasonDeco spot="plan-card" />
+     </Section>
+ 
+-    {!S.routines.length && <EmptyState className="plan-empty" icon="clipboard" title={t('No routines yet.')} text={t('Make one, or grab the starter plan to get going.')}>
++    {!myRoutines.length && <EmptyState className="plan-empty" icon="clipboard" title={t('No routines yet.')} text={t('Make one, or grab the starter plan to get going.')}>
+       <Button variant="tinted" icon="clipboard" onClick={starterPlanSheet}>{t('Load starter plan')}</Button>
+     </EmptyState>}
+ 
+@@ -343,7 +344,7 @@ function Schedule({ S, update, nav, mode }) {
+         {!external && <div className="row plan-sec-acts" style={{ gap: 6 }}>
+           {seq.length > 0 && <button className="plan-textbtn" aria-pressed={editLoop} onClick={() => setEditLoop(e => !e)}>{editLoop ? t('Done') : t('Edit')}</button>}
+           <Button size="sm" variant="tinted" icon="plus" data-tour="plan-loop-add" aria-label={t('Add routine to the rotation')}
+-            disabled={!S.routines.length} onClick={addToSeq}>{t('Add')}</Button>
++            disabled={!myRoutines.length} onClick={addToSeq}>{t('Add')}</Button>
+         </div>}
+       </div>
+       {seq.length ? <div className="list plan-loop" ref={loopReorder.listRef}>
+@@ -403,7 +404,7 @@ function Schedule({ S, update, nav, mode }) {
+ 
+     {/* Weekly muscle volume is analysis: it moved to Stats, next to Muscle balance. Stats only
+         shows that card once there is a routine, so the link waits for one too. */}
+-    {S.routines.length > 0 && <Section className="plan-link">
++    {myRoutines.length > 0 && <Section className="plan-link">
+       <Row icon="chart" iconTint="var(--indigo)" title={t('Weekly muscle volume')} subtitle={t('Now in Stats, next to Muscle balance')}
+         accessory="chevron" onClick={() => nav('/stats?focus=weekly-volume')} />
+     </Section>}
+@@ -416,14 +417,21 @@ function Routines({ S, update, nav }) {
+   const [edit, setEdit] = useState(false)
+   const [flash, setFlash] = useState(null)
+   const swipe = workoutControls(S).swipeSets
+-  const routines = S.routines
++  const routines = personalRoutines(S.routines)
+   // The order of this list is the order of `S.routines`, and every other screen reads the same
+   // array (the Start screen, the day sheets, the routine pickers), so moving a routine here moves
+   // it everywhere (#142). Reordering lives behind Edit, like on an iPhone.
+   const reorder = useListReorder(routines.length, (from, to) => update(s => {
+-    if (to < 0 || to >= s.routines.length) return
+-    const [m] = s.routines.splice(from, 1)
+-    s.routines.splice(to, 0, m)
++    const visible = personalRoutines(s.routines)
++    const movingId = visible[from]?.id
++    const targetId = visible[to]?.id
++    if (!movingId || !targetId || movingId === targetId) return
++    const movingAt = s.routines.findIndex(r => r.id === movingId)
++    const targetAt = s.routines.findIndex(r => r.id === targetId)
++    if (movingAt < 0 || targetAt < 0) return
++    const [moving] = s.routines.splice(movingAt, 1)
++    const adjustedTargetAt = s.routines.findIndex(r => r.id === targetId)
++    s.routines.splice(adjustedTargetAt + (to > from ? 1 : 0), 0, moving)
+   }))
+ 
+   const addRoutine = () => {
+diff --git a/frontend/src/views/RoutineEdit.jsx b/frontend/src/views/RoutineEdit.jsx
+index 0d744eb..5297bec 100644
+--- a/frontend/src/views/RoutineEdit.jsx
++++ b/frontend/src/views/RoutineEdit.jsx
+@@ -597,7 +597,12 @@ export default function RoutineEdit() {
+       <button type="button" className="lrow tap danger" onClick={() => confirmSheet({
+         title: t('Delete routine?'), message: t('“{0}” and its exercises will be removed.', r.name), confirmText: t('Delete'), danger: true,
+         onConfirm: () => {
+-          update(s => { deleteRoutine(s, id) })
++          update(s => {
++            for (const student of s.coachStudents || []) {
++              student.routineIds = (student.routineIds || []).filter(routineId => routineId !== id)
++            }
++            deleteRoutine(s, id)
++          })
+           nav('/plan')
+         }
+       })}><Icon name="trash" className="re-act-i" /><span className="lrow-m"><span className="lrow-t">{t('Delete routine')}</span>
+diff --git a/frontend/src/views/Workout.jsx b/frontend/src/views/Workout.jsx
+index 2d4cf30..2a0c6ef 100644
+--- a/frontend/src/views/Workout.jsx
++++ b/frontend/src/views/Workout.jsx
+@@ -45,7 +45,7 @@ import { defaultIncrement, weightIncrement, stepWeight } from '../lib/progressio
+ import { progressionGuidance } from '../lib/progression-copy.js'
+ import { rpeAs } from '../lib/programmes.js'
+ import { buildPlannedEntry, buildSessionEntry, plannedConfigOf, builtOutOfProgression } from '../lib/session-start.js'
+-import { routineChangesFromEntry, updateRoutineFromEntry, routineSlotIndex, ownWarmupsChange, keepOwnWarmups } from '../lib/routines.js'
++import { routineChangesFromEntry, updateRoutineFromEntry, routineSlotIndex, ownWarmupsChange, keepOwnWarmups, personalRoutines } from '../lib/routines.js'
+ import { ownRowsLine } from '../lib/warmup-ramp.js'
+ import { useCoachGate } from '../lib/use-coach-gate.js'
+ // Opened in the same tick as the menu closes, like every other sheet from that menu: a sheet that
+@@ -86,7 +86,7 @@ function StartChooser() {
+   const todayName = todayRoutines.map(r => r.name).join(' + ')
+   const todayOvr = S.dayPlan[todayISO()] !== undefined && pinState(S, S.dayPlan[todayISO()]) !== 'done' // a fulfilled pin is no override
+   const idSet = new Set(todayIds)
+-  const others = S.routines.filter(r => !idSet.has(r.id))
++  const others = personalRoutines(S.routines).filter(r => !idSet.has(r.id))
+   return <div className="narrow">
+     <div className="hdr"><div><h1>{t('Start workout')}</h1><div className="sub">{t(DAYN[new Date().getDay()])} · {todayRoutines.length ? t('today is {0}', todayName) : t('rest day, but no one’s stopping you')}</div></div></div>
+     {todayRoutines.length > 0 && <div className="card" style={{ borderColor: 'var(--acc)' }}>
+@@ -104,7 +104,7 @@ function StartChooser() {
+         <span className="tag acc">{t('Start')}</span></div>)}</div></>}
+     <div style={{ height: 14 }} />
+     <Button icon="shuffle" onClick={() => startFlow([])}>{t('Freestyle workout (pick as you go)')}</Button>
+-    {!S.routines.length && <><div style={{ height: 10 }} /><Button variant="primary" onClick={() => nav('/plan')}>{t('Build a plan first')}</Button></>}
++    {!personalRoutines(S.routines).length && <><div style={{ height: 10 }} /><Button variant="primary" onClick={() => nav('/plan')}>{t('Build a plan first')}</Button></>}
+   </div>
+ }
+ 
+-- 
+2.51.1
+
