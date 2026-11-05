@@ -65,11 +65,24 @@
     if (!save()) db.drafts[id] = before;
     render();
   };
-  const previousUpdate = root.updateStudentRecord;
   root.updateStudentRecord = function (id, index, field, value) {
     const record = db.drafts[id]?.records[index];
     if (!record || record.done) { render(); return; }
-    previousUpdate(id, index, field, value);
+    if (!['load', 'reps', 'left', 'right'].includes(field)) return;
+    const text = String(value ?? '').trim().replace(',', '.');
+    const number = text === '' ? null : Number(text);
+    const max = field === 'load' ? 2000 : 500;
+    if (number !== null && (!Number.isFinite(number) || number < 0 || number > max || field !== 'load' && !Number.isInteger(number))) {
+      toast(field === 'load' ? 'Informe uma carga de 0 a 2000.' : 'Informe repetições inteiras de 0 a 500.');
+      render(); return;
+    }
+    commit(record, () => {
+      if (field === 'load') { record.load = number; record.manualLoad = true; }
+      else {
+        record[field] = number === null ? '' : String(number);
+        if (field === 'left' || field === 'right') record.reps = 'E: ' + (record.left || '—') + ' · D: ' + (record.right || '—');
+      }
+    });
   };
   const previousToggle = root.toggleStudentSet;
   root.toggleStudentSet = function (id, index, checked) {
@@ -150,6 +163,11 @@
     if (record.workStartedAt) return 'Pare o cronômetro para registrar o tempo antes de concluir.';
     const mode = record.executionMode || item.executionMode || 'reps';
     if (mode !== 'reps' && !(record.durationSeconds > 0)) return 'Registre a duração realizada em segundos.';
+    if (mode === 'reps') {
+      if (item.sideMode === 'separate') {
+        if (![record.left, record.right].every(value => /^\d+$/.test(String(value)) && Number(value) > 0 && Number(value) <= 500)) return 'Registre repetições inteiras de 1 a 500 para os dois lados.';
+      } else if (!/^\d+$/.test(String(record.reps)) || Number(record.reps) < 1 || Number(record.reps) > 500) return 'Registre as repetições realizadas de 1 a 500.';
+    }
     if (blockCount(record)) {
       if (!(/^\d+$/.test(String(record.reps)) && Number(record.reps) > 0) && !(Number(record.left) > 0 && Number(record.right) > 0)) return 'Registre as repetições da série principal.';
       if (record.blocks?.length !== blockCount(record) || record.blocks.some(b => !b || !bounded(b.load, 2000) || !Number.isInteger(b.reps) || b.reps < 1 || b.reps > 500)) return 'Preencha a carga e as repetições de cada bloco.';

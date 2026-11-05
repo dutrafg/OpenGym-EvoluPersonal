@@ -58,3 +58,18 @@ Sugestões antigas da sessão corrigida são removidas.
 Corrigida a leitura de duração/cardio sem carga e a validação de exercícios
 com modo por tempo que ainda conservam configuração de progressão antiga.
 Validação visual completa em navegadores Android permanece pendente.
+
+## Revisão de entrada da etapa 3 — Beta 1.5.1
+
+Foram encontradas e corrigidas pendências de execução da etapa 1:
+reverter alterações de carga/repetições quando a gravação falha, rejeitar valores
+não numéricos e impedir conclusão com metas em faixa em vez de repetições reais.
+Testes de regressão das etapas 1 e 2 passaram após a correção.
+
+A etapa 3 aguarda a validação visual e do fluxo completo em Android das etapas
+anteriores. A tentativa de instalar Chromium no ambiente de testes retornou
+download inválido. Testes com mocks e Node não equivalem à validação no Android.
+
+Código de referência da etapa 3 já consultado preliminarmente: favourites.js,
+plates.js e plan-share.js da revisão OpenGym 8fb98b1. Implementação ainda não
+iniciada, respeitando a condição de resolver as pendências anteriores.
