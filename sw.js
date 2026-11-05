@@ -1,6 +1,9 @@
 'use strict';
 
 const CACHE_NAME = 'evolupersonal-md500-offline-v3';
+// Increment SHELL_CACHE on every release, even when only index.html changes.
+// Keep CACHE_NAME stable to preserve downloaded exercise media.
+const SHELL_CACHE = 'evolupersonal-shell-beta-1.3';
 // Beta 1.2 — recuperação de downloads e navegação offline; mantém v3 para preservar a mídia já baixada offline.
 const SCOPE_URL = self.registration.scope;
 const SHELL = ['./index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './training-methods.js', './insights.js', './programs.js', './offline-assets.json', './OFFLINE_CREDITS.md'];
@@ -51,16 +54,15 @@ async function cachedExternalResponse(value) {
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
-    await cache.addAll(SHELL.map(path => new Request(new URL(path, SCOPE_URL))));
-    await self.skipWaiting();
+    const cache = await caches.open(SHELL_CACHE);
+    await cache.addAll(SHELL.map(path => new Request(new URL(path, SCOPE_URL), { cache: 'reload' })));
   })());
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(key => key.startsWith('evolupersonal-md500-offline-') && key !== CACHE_NAME).map(key => caches.delete(key)));
+    await Promise.all(keys.filter(key => key.startsWith('evolupersonal-shell-') && key !== SHELL_CACHE).map(key => caches.delete(key)));
     await self.clients.claim();
   })());
 });
@@ -77,8 +79,14 @@ self.addEventListener('fetch', event => {
   if (requestURL.origin !== self.location.origin) return;
 
   event.respondWith((async () => {
-    const cache = await caches.open(CACHE_NAME);
     const isNavigation = request.mode === 'navigate';
+    const shellRequest = isNavigation || SHELL.some(path => new URL(path, SCOPE_URL).pathname === requestURL.pathname);
+    const cache = await caches.open(shellRequest ? SHELL_CACHE : CACHE_NAME);
+    if (shellRequest) {
+      const installed = await cache.match(request, { ignoreSearch: true })
+        || (isNavigation ? await cache.match(new URL('./index.html', SCOPE_URL).href) : null);
+      if (installed) return installed;
+    }
     if (!isNavigation) {
       const cached = await cache.match(request, { ignoreSearch: true });
       if (cached) return cached;
@@ -115,7 +123,7 @@ self.addEventListener('message', event => {
     let manifest;
     try {
       const manifestURL = new URL('./offline-assets.json', SCOPE_URL);
-      const response = await fetch(manifestURL).catch(() => cache.match(manifestURL));
+      const response = await fetch(manifestURL).catch(async () => await (await caches.open(SHELL_CACHE)).match(manifestURL) || await cache.match(manifestURL));
       if (!response?.ok) throw new Error('Não foi possível obter a lista de mídias. Conecte-se para baixar o pacote pela primeira vez.');
       manifest = await response.json();
     } catch (error) {

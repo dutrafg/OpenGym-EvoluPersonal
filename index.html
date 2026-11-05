@@ -124,7 +124,7 @@
 }
 @media(prefers-reduced-motion:reduce){.rail{scroll-behavior:auto!important}}
 </style></head><body>
-<div class="shell"><nav class="rail" aria-label="Navegação principal"><div class="brand">e</div><div id="nav" style="display:contents"></div><button class="bottom" id="themeRail" aria-label="Alternar tema"></button></nav><main class="main"><header class="top"><div class="row"><div class="wordmark">evolu<span>personal</span></div><span class="tag">BETA 1.2 · VERSÃO DE TESTE</span></div><div class="tools"><button id="modeBtn"></button><button id="themeBtn" aria-label="Alternar tema"></button></div></header><div id="app"><section class="notice" id="appBootFallback"><strong>Carregando a prévia do EvoluPersonal…</strong><p style="margin:6px 0 0">Se esta mensagem continuar, o navegador bloqueou ou interrompeu o JavaScript. Abra a versão corrigida em um navegador com JavaScript habilitado.</p></section></div><footer class="foot">EvoluPersonal · Beta 1.2</footer></main></div>
+<div class="shell"><nav class="rail" aria-label="Navegação principal"><div class="brand">e</div><div id="nav" style="display:contents"></div><button class="bottom" id="themeRail" aria-label="Alternar tema"></button></nav><main class="main"><header class="top"><div class="row"><div class="wordmark">evolu<span>personal</span></div><span class="tag">BETA 1.3 · VERSÃO DE TESTE</span></div><div class="tools"><button id="modeBtn"></button><button id="themeBtn" aria-label="Alternar tema"></button></div></header><div id="app"><section class="notice" id="appBootFallback"><strong>Carregando a prévia do EvoluPersonal…</strong><p style="margin:6px 0 0">Se esta mensagem continuar, o navegador bloqueou ou interrompeu o JavaScript. Abra a versão corrigida em um navegador com JavaScript habilitado.</p></section></div><footer class="foot">EvoluPersonal · Beta 1.3</footer></main></div>
 <dialog id="modal"><div class="between"><h2 id="modalTitle"></h2><button class="quiet" onclick="closeModal()" aria-label="Fechar janela">✕</button></div><div class="modalbody" id="modalBody"></div></dialog><div id="toast" role="status" hidden></div><div id="timer" hidden><small>DESCANSO</small><b id="clock">00:00</b><div class="row"><button onclick="pauseTimer()" id="pauseBtn">Pausar</button><button onclick="stopTimer()">Encerrar</button></div></div>
 <script>
 'use strict';
@@ -1976,7 +1976,7 @@ EvoluPrograms.boot();
   function pwaPanel() {
     const secure = window.isSecureContext, supported = 'serviceWorker' in navigator && secure, standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
     const state = !supported ? 'Use o endereço HTTPS publicado para instalar e habilitar recursos offline.' : standalone ? 'Instalado como aplicativo.' : 'Pronto para instalar pelo navegador.';
-    return '<section class="card section"><div class="eyebrow">ETAPA 10 · INSTALAÇÃO E OFFLINE</div><h2>Aplicativo neste dispositivo</h2><p class="muted" id="epPwaStatus" aria-live="polite">' + state + '</p><div class="row wrap"><button id="epInstallButton" class="primary" onclick="epInstallPWA()" ' + (installPrompt ? '' : 'hidden') + '>Instalar EvoluPersonal</button><button onclick="epCheckPWA()">Verificar instalação</button><button onclick="epUpdatePWA()" ' + (supported ? '' : 'disabled') + '>Verificar atualização</button></div><p class="muted" id="epStorageStatus">Consultando armazenamento deste navegador…</p><div class="notice">Os dados de alunos permanecem neste dispositivo. Exporte um backup JSON regularmente; instalar o PWA não transfere dados para outro aparelho.</div></section>';
+    return '<section class="card section"><div class="eyebrow">ETAPA 10 · INSTALAÇÃO E OFFLINE</div><h2>Aplicativo neste dispositivo</h2><p class="muted" id="epPwaStatus" aria-live="polite">' + state + '</p><div class="row wrap"><button id="epInstallButton" class="primary" onclick="epInstallPWA()" ' + (installPrompt ? '' : 'hidden') + '>Instalar EvoluPersonal</button><button onclick="epCheckPWA()">Verificar instalação</button><button id="epUpdateCheck" onclick="epUpdatePWA()" ' + (supported ? '' : 'disabled') + '>Verificar atualização</button><button id="epUpdateApply" class="primary" onclick="epApplyUpdate()" hidden>Atualizar agora</button></div><p class="muted" id="epUpdateStatus" role="status">Versão instalada · Beta 1.3</p><p class="muted" id="epStorageStatus">Consultando armazenamento deste navegador…</p><div class="notice">Os dados de alunos permanecem neste dispositivo. Exporte um backup JSON regularmente; instalar o PWA não transfere dados para outro aparelho.</div></section>';
   }
   window.epInstallPWA = async function () {
     if (!installPrompt) return toast('No celular, abra o menu do navegador e escolha “Instalar aplicativo” ou “Adicionar à tela inicial”.');
@@ -1996,50 +1996,98 @@ EvoluPrograms.boot();
     if (!window.isSecureContext || !('serviceWorker' in navigator)) {
       if (el) el.textContent = 'Abra o app publicado em HTTPS para habilitar a instalação e o uso offline.';
     } else {
-      try { pwaRegistration = await navigator.serviceWorker.getRegistration('./') || await navigator.serviceWorker.register('./sw.js', { scope: './' }); if(navigator.onLine)await pwaRegistration.update(); if (el) el.textContent = 'Service worker ativo · versão de cache v3 · ' + ((window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) ? 'instalado como aplicativo.' : 'pode ser instalado pelo navegador.'); }
+      try { pwaRegistration = await navigator.serviceWorker.getRegistration('./') || await navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }); watchRegistration(pwaRegistration); if (el) el.textContent = (pwaRegistration.active ? 'Aplicativo preparado neste dispositivo · ' : 'Preparando o aplicativo · ') + ((window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) ? 'instalado como aplicativo.' : 'pode ser instalado pelo navegador.'); }
       catch (_) { if (el) el.textContent = 'Não foi possível conferir a instalação. Verifique a conexão e tente novamente.'; }
     }
     const storage = document.getElementById('epStorageStatus');
     if (storage && navigator.storage?.estimate) { try { const x = await navigator.storage.estimate(), used = (x.usage || 0) / 1048576, quota = (x.quota || 0) / 1048576; storage.textContent = 'Armazenamento do navegador: ' + used.toFixed(1) + ' MB usados de ' + quota.toFixed(0) + ' MB disponíveis.'; } catch (_) { storage.textContent = 'O navegador não informou o uso de armazenamento.'; } }
   };
-  window.epUpdatePWA = async function () {
-    const status = document.getElementById('epPwaStatus');
-    const report = message => { if (status) status.textContent = message; toast(message); };
-    try {
-      if (!window.isSecureContext || !('serviceWorker' in navigator)) {
-        return report('A verificação exige o app publicado em HTTPS.');
-      }
-      pwaRegistration = pwaRegistration || await navigator.serviceWorker.getRegistration('./');
-      if (!pwaRegistration) {
-        return report('Nenhum service worker ativo. Use “Verificar instalação” primeiro.');
-      }
-      let resolveFound;
-      const updateFound = new Promise(resolve => { resolveFound = resolve; });
-      pwaRegistration.addEventListener('updatefound', () => resolveFound(pwaRegistration.installing), { once: true });
-      await pwaRegistration.update();
-      let worker = pwaRegistration.installing || pwaRegistration.waiting;
-      if (!worker) worker = await Promise.race([updateFound, new Promise(resolve => setTimeout(() => resolve(null), 1600))]);
-      worker = pwaRegistration.installing || pwaRegistration.waiting || worker;
-      if (!worker) return report('Verificação concluída. O aplicativo já está atualizado.');
-      if (pwaRegistration.waiting) pwaRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      const settled = worker.state === 'activated' || await new Promise(resolve => {
-        const finish = value => {
-          clearTimeout(timer);
-          worker.removeEventListener('statechange', check);
-          resolve(value);
-        };
-        const check = () => {
-          if (worker.state === 'activated') finish(true);
-          else if (worker.state === 'redundant') finish(false);
-        };
-        const timer = setTimeout(() => finish(false), 15000);
-        worker.addEventListener('statechange', check);
-        check();
+  let checkingUpdate = false, applyingUpdate = false, updateTimer = null;
+  const watchedRegistrations = new WeakSet(), watchedWorkers = new WeakSet();
+  function updateStatus(message) {
+    const status = document.getElementById('epUpdateStatus');
+    if (status) status.textContent = message;
+  }
+  function showReadyUpdate() {
+    const button = document.getElementById('epUpdateApply');
+    if (button) button.hidden = !pwaRegistration?.waiting;
+    if (pwaRegistration?.waiting) updateStatus('Nova versão pronta. Salve suas alterações antes de atualizar.');
+  }
+  function watchWorker(worker) {
+    if (!worker || watchedWorkers.has(worker)) return;
+    watchedWorkers.add(worker);
+    worker.addEventListener('statechange', () => {
+      if (worker.state === 'installed') showReadyUpdate();
+      if (worker.state === 'redundant') updateStatus('A nova versão não pôde ser preparada. Tente verificar novamente.');
+    });
+  }
+  function watchRegistration(registration) {
+    if (!watchedRegistrations.has(registration)) {
+      watchedRegistrations.add(registration);
+      registration.addEventListener('updatefound', () => {
+        watchWorker(registration.installing);
+        updateStatus('Baixando a nova versão. Você pode continuar usando o app.');
       });
-      if (!settled) return report('A atualização ainda está sendo preparada. Tente novamente em alguns segundos.');
-      report('Atualização aplicada ao service worker. Recarregue o app para abrir a versão nova.');
+    }
+    watchWorker(registration.installing);
+    showReadyUpdate();
+  }
+  window.epUpdatePWA = async function () {
+    if (checkingUpdate || applyingUpdate) return;
+    if (!window.isSecureContext || !('serviceWorker' in navigator)) return updateStatus('Abra o aplicativo pelo endereço HTTPS para verificar atualizações.');
+    if (!navigator.onLine) return updateStatus('Conecte-se à internet para verificar atualizações.');
+    checkingUpdate = true;
+    const button = document.getElementById('epUpdateCheck');
+    if (button) button.disabled = true;
+    updateStatus('Verificando atualização…');
+    try {
+      pwaRegistration = pwaRegistration || await navigator.serviceWorker.getRegistration('./')
+        || await navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' });
+      watchRegistration(pwaRegistration);
+      await pwaRegistration.update();
+      if (pwaRegistration.waiting) showReadyUpdate();
+      else if (pwaRegistration.installing) {
+        watchWorker(pwaRegistration.installing);
+        updateStatus('Baixando a nova versão. Você pode continuar usando o app.');
+      } else updateStatus('Verificação concluída. Você está na versão mais recente disponível.');
     } catch (_) {
-      report('Não foi possível verificar atualizações agora. Verifique a conexão e tente novamente.');
+      updateStatus('Não foi possível verificar agora. Tente novamente quando a conexão estiver disponível.');
+    } finally {
+      checkingUpdate = false;
+      if (button) button.disabled = false;
+    }
+  };
+  window.epApplyUpdate = function () {
+    const worker = pwaRegistration?.waiting;
+    if (!worker || applyingUpdate) return;
+    if (typeof activeStudentWorkout !== 'undefined' && activeStudentWorkout) {
+      return updateStatus('Finalize o treino em andamento antes de atualizar.');
+    }
+    if (!confirm('Salvou suas alterações? O aplicativo será reaberto para aplicar a nova versão.')) return;
+    if (!save()) return updateStatus('Não foi possível salvar os dados. Exporte um backup antes de atualizar.');
+    applyingUpdate = true;
+    const button = document.getElementById('epUpdateApply');
+    if (button) button.disabled = true;
+    updateStatus('Aplicando atualização…');
+    const finish = () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', finish);
+      clearTimeout(updateTimer);
+      location.reload();
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', finish);
+    updateTimer = setTimeout(() => {
+      navigator.serviceWorker.removeEventListener('controllerchange', finish);
+      applyingUpdate = false;
+      if (button) button.disabled = false;
+      updateStatus('A atualização demorou. Verifique novamente e tente aplicar.');
+    }, 30000);
+    try { worker.postMessage({ type: 'SKIP_WAITING' }); }
+    catch (_) {
+      clearTimeout(updateTimer);
+      navigator.serviceWorker.removeEventListener('controllerchange', finish);
+      applyingUpdate = false;
+      if (button) button.disabled = false;
+      updateStatus('Não foi possível aplicar agora. Verifique novamente.');
     }
   };
   const priorSettings = window.settings;
