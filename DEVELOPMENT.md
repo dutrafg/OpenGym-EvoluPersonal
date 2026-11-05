@@ -66,10 +66,41 @@ reverter alterações de carga/repetições quando a gravação falha, rejeitar 
 não numéricos e impedir conclusão com metas em faixa em vez de repetições reais.
 Testes de regressão das etapas 1 e 2 passaram após a correção.
 
-A etapa 3 aguarda a validação visual e do fluxo completo em Android das etapas
-anteriores. A tentativa de instalar Chromium no ambiente de testes retornou
+A validação visual e do fluxo completo em Android das etapas anteriores continua pendente. A tentativa de instalar Chromium no ambiente de testes retornou
 download inválido. Testes com mocks e Node não equivalem à validação no Android.
 
 Código de referência da etapa 3 já consultado preliminarmente: favourites.js,
-plates.js e plan-share.js da revisão OpenGym 8fb98b1. Implementação ainda não
-iniciada, respeitando a condição de resolver as pendências anteriores.
+plates.js e plan-share.js da revisão OpenGym 8fb98b1. A implementação da etapa 3 está descrita abaixo; sua homologação em Android permanece pendente.
+
+
+## Etapa 3 — Beta 1.6 RC (em homologação)
+
+Código OpenGym consultado novamente na revisão
+`8fb98b16861a2728652302a7e6e30c50548493a0`:
+`frontend/src/lib/favourites.js`, `plates.js` e `plan-share.js`.
+Nenhuma mídia nem biblioteca de exercícios do OpenGym foi incorporada.
+
+Implementação própria em `routine-tools.js`:
+
+- Favoritos persistidos por ID MD, filtro exclusivo e prioridade estável na
+  Biblioteca e no seletor do editor de treino. Preferências não são compartilhadas.
+- Equipamentos em kg: peso da barra e estoque de pares por tamanho. A calculadora
+  monta cargas simétricas sem ultrapassar o estoque ou a carga desejada; informa
+  a diferença quando a meta não é possível. Não altera prescrições ou registros.
+- Arquivo JSON de rotinas versão 1 com apenas título, orientações e prescrição
+  selecionada. Sem alunos, contatos, avaliações, sessões ou preferências.
+- Importação com prévia, escolha de aluno e IDs novos; adiciona cópias sem
+  substituir rotinas, agenda ou histórico. Limite de 1 MB e validação integral
+  pelo validador atual antes de gravar. Falha de armazenamento desfaz alterações.
+- Módulo incluído no shell offline com chave nova para a versão RC.
+
+Verificação: `node --test tests/routine-tools.test.cjs` (sete testes, incluindo
+mil estoques comparados com busca exaustiva). Integração adicional em DOM simulado:
+carregamento de todos os scripts sem exceções, favorito/filtro, formulário de
+estoque, calculadora, importação com prévia e confirmação, preservação de alunos,
+rollback em falha de gravação e rejeição de prescrição avançada inválida.
+
+Pendente: validação visual e fluxo em navegador real, em especial Android, antes
+de declarar a etapa concluída. DOM simulado não comprova layout, download do
+arquivo, instalação PWA ou cache real. A RC fica em branch de desenvolvimento;
+a main permanece na Beta 1.5.2 das 37 mídias aprovadas.

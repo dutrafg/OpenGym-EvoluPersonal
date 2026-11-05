@@ -48,3 +48,14 @@ Foram verificados os 12 scripts inline, o service worker, os arquivos JSON do PW
 ## Beta 1.5.2 · mídias aprovadas
 
 O lote está em `media/approved-37/`, com IDs MD preservados e manifesto de associação. California Press (md414) e Razor Curl (md240) usam as versões refeitas. O shell foi atualizado sem apagar o cache das mídias anteriores.
+
+## Etapa 3 · Beta 1.6 RC
+
+Em desenvolvimento: favoritos na Biblioteca e no editor de treino, estoque de
+anilhas e peso da barra em **Ajustes → Equipamentos**, cálculo de montagem e
+compartilhamento por arquivo JSON em **Treinos → Compartilhar/Importar rotinas**.
+A importação pede um aluno e adiciona cópias; o histórico e as rotinas existentes
+são preservados. Revise as orientações livres antes de compartilhar.
+
+Testes: `node --test tests/routine-tools.test.cjs`.
+Validação visual em Android ainda pendente; não é uma etapa encerrada.
