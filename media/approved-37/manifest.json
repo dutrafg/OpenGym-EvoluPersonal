@@ -1,0 +1,303 @@
+{
+  "batch": "approved-37",
+  "count": 37,
+  "approval": "Aprovação visual do usuário em 2026-11-05; não equivale a validação biomecânica.",
+  "items": [
+    {
+      "id": "md171",
+      "name": "Leg Press Articulado (Iso-Lateral)",
+      "src": "./media/approved-37/md171.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 184094
+    },
+    {
+      "id": "md173",
+      "name": "Leg Press Horizontal Unilateral",
+      "src": "./media/approved-37/md173.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 184800
+    },
+    {
+      "id": "md214",
+      "name": "RDL na Máquina de Hack / V-Squat Invertido",
+      "src": "./media/approved-37/md214.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 111940
+    },
+    {
+      "id": "md219",
+      "name": "Bom Dia na Máquina (Hack Squat ou Pendulum)",
+      "src": "./media/approved-37/md219.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 131318
+    },
+    {
+      "id": "md228",
+      "name": "Flexora Ajoelhada na Máquina (Kneeling Leg Curl)",
+      "src": "./media/approved-37/md228.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 152076
+    },
+    {
+      "id": "md240",
+      "name": "Razor Curl no Aparelho de GHR",
+      "src": "./media/approved-37/md240.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 162060
+    },
+    {
+      "id": "md250",
+      "name": "Elevação Pélvica na Cadeira Extensora / Mesa Flexora (Adaptação)",
+      "src": "./media/approved-37/md250.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 188026
+    },
+    {
+      "id": "md269",
+      "name": "Coice no Smith (Empurrando a barra com a sola do pé em 4 apoios)",
+      "src": "./media/approved-37/md269.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 164520
+    },
+    {
+      "id": "md275",
+      "name": "Cadeira Abdutora em Pé (Sem sentar no banco)",
+      "src": "./media/approved-37/md275.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 155348
+    },
+    {
+      "id": "md278",
+      "name": "Abdução de Quadril Deitado de Lado na Polia Baixa",
+      "src": "./media/approved-37/md278.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 138240
+    },
+    {
+      "id": "md290",
+      "name": "Máquina Multiquadril (4-Way Hip Machine - Extensão, Flexão, Abdução, Adução)",
+      "src": "./media/approved-37/md290.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 158990
+    },
+    {
+      "id": "md308",
+      "name": "Viking Press (No acessório específico ou Landmine)",
+      "src": "./media/approved-37/md308.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 132996
+    },
+    {
+      "id": "md311",
+      "name": "Bradford Press (Passando a barra da frente para trás da cabeça sem trancar os cotovelos)",
+      "src": "./media/approved-37/md311.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 163542
+    },
+    {
+      "id": "md346",
+      "name": "Powell Raise (Crucifixo inverso unilateral deitado de lado no banco)",
+      "src": "./media/approved-37/md346.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 157228
+    },
+    {
+      "id": "md372",
+      "name": "Rosca na Máquina (Sentado, braços na horizontal)",
+      "src": "./media/approved-37/md372.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 146106
+    },
+    {
+      "id": "md381",
+      "name": "Rosca Inclinada na Polia Baixa (Banco a 45° posicionado no crossover)",
+      "src": "./media/approved-37/md381.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 176798
+    },
+    {
+      "id": "md396",
+      "name": "Pronação e Supinação de Antebraço com Halter ou Barra unilateral",
+      "src": "./media/approved-37/md396.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 153174
+    },
+    {
+      "id": "md397",
+      "name": "Flexão Radial e Ulnar de Punho (Movimento de martelada em pé com halter)",
+      "src": "./media/approved-37/md397.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 187476
+    },
+    {
+      "id": "md413",
+      "name": "JM Press com Barra ou no Smith (Híbrido entre Supino Fechado e Testa)",
+      "src": "./media/approved-37/md413.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 164284
+    },
+    {
+      "id": "md414",
+      "name": "California Press",
+      "src": "./media/approved-37/md414.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 149812
+    },
+    {
+      "id": "md427",
+      "name": "Tríceps Francês Sentado na Máquina Específica",
+      "src": "./media/approved-37/md427.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 162620
+    },
+    {
+      "id": "md428",
+      "name": "PJR Pullover (Híbrido de Pullover com Francês usando Halter pesado)",
+      "src": "./media/approved-37/md428.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 153430
+    },
+    {
+      "id": "md440",
+      "name": "Pin Press Fechado (Empurrada final do supino saindo dos pinos de segurança)",
+      "src": "./media/approved-37/md440.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 163210
+    },
+    {
+      "id": "md451",
+      "name": "Panturrilha no V-Squat / Pêndulo",
+      "src": "./media/approved-37/md451.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 127266
+    },
+    {
+      "id": "md456",
+      "name": "Panturrilha Agachado (Squat Calf Raise / Iso-Hold)",
+      "src": "./media/approved-37/md456.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 180154
+    },
+    {
+      "id": "md457",
+      "name": "Caminhada na Ponta dos Pés com Halteres (Farmer's Walk on Toes)",
+      "src": "./media/approved-37/md457.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 208632
+    },
+    {
+      "id": "md459",
+      "name": "Elevação Tibial com Barra Tibial ou Kettlebell (Weighted Tib Raise)",
+      "src": "./media/approved-37/md459.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 146064
+    },
+    {
+      "id": "md477",
+      "name": "Abdominal GHD (Glute-Ham Developer Sit-up)",
+      "src": "./media/approved-37/md477.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 99606
+    },
+    {
+      "id": "md478",
+      "name": "Abdominal Janda (Janda Sit-up - contraindo posteriores para anular o psoas)",
+      "src": "./media/approved-37/md478.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 133820
+    },
+    {
+      "id": "md480",
+      "name": "L-Sit (Sustentação isométrica em L nas paralelas ou argolas)",
+      "src": "./media/approved-37/md480.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 117094
+    },
+    {
+      "id": "md487",
+      "name": "Lenhador Horizontal na Polia Média",
+      "src": "./media/approved-37/md487.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 137248
+    },
+    {
+      "id": "md489",
+      "name": "Rotação de Tronco no Landmine em Pé (Landmine 180s / Rainbow)",
+      "src": "./media/approved-37/md489.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 96594
+    },
+    {
+      "id": "md490",
+      "name": "Elevação de Pernas Oblíqua na Barra Fixa (Windshield Wipers / Para-brisa)",
+      "src": "./media/approved-37/md490.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 112360
+    },
+    {
+      "id": "md492",
+      "name": "Flexão Lateral de Tronco no Banco Romano (45°)",
+      "src": "./media/approved-37/md492.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 115246
+    },
+    {
+      "id": "md494",
+      "name": "Prancha Dinâmica na Bola Suíça (Stir the Pot)",
+      "src": "./media/approved-37/md494.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 127798
+    },
+    {
+      "id": "md495",
+      "name": "Prancha RKC (Contração máxima de glúteos, quadríceps e dorsais)",
+      "src": "./media/approved-37/md495.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 184978
+    },
+    {
+      "id": "md500",
+      "name": "Vacuum Abdominal (Contração isométrica do Transverso do Abdômen)",
+      "src": "./media/approved-37/md500.webp",
+      "type": "static-two-position",
+      "review": "approved_visual",
+      "bytes": 158752
+    }
+  ]
+}

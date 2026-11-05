@@ -12,3 +12,7 @@ O pacote também pode armazenar imagens de referência dos catálogos GymBells e
 - Workout Guide: https://github.com/bryllim/workout-guide — CC BY-SA 4.0.
 
 As imagens são referências visuais. A associação com um exercício não constitui validação biomecânica.
+
+## Ilustrações EvoluPersonal · lote de 37
+
+Imagens originais geradas por IA para o projeto e aprovadas visualmente pelo usuário em 2026-11-05. São ilustrações estáticas em duas posições, não GIFs. Arquivos WebP em `media/approved-37/`; associação por ID no manifesto do lote. A aprovação visual não equivale a validação biomecânica.

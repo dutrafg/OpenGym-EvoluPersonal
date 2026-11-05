@@ -3,7 +3,7 @@
 const CACHE_NAME = 'evolupersonal-md500-offline-v3';
 // Increment SHELL_CACHE on every release, even when only index.html changes.
 // Keep CACHE_NAME stable to preserve downloaded exercise media.
-const SHELL_CACHE = 'evolupersonal-shell-beta-1.5.1';
+const SHELL_CACHE = 'evolupersonal-shell-beta-1.5.2';
 // Beta 1.2 — recuperação de downloads e navegação offline; mantém v3 para preservar a mídia já baixada offline.
 const SCOPE_URL = self.registration.scope;
 const SHELL = ['./index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './training-methods.js', './insights.js', './programs.js', './execution.js', './history-tools.js', './offline-assets.json', './OFFLINE_CREDITS.md'];

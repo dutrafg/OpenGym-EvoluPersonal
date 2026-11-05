@@ -8,9 +8,9 @@ PWA estático para personal trainers: alunos, rotinas, sessões, avaliações, a
 - 445 exercícios têm GIF próprio associado.
 - 25 associações OpenExerciseBase usam 24 arquivos de referência distintos.
 - 13 novas associações externas foram adicionadas como candidatas para conferência visual; nenhuma foi marcada automaticamente como aprovada.
-- 37 exercícios ainda não têm mídia nem candidato ativo. Use o filtro **Sem mídia vinculada** na Biblioteca.
+- 37 exercícios antes sem mídia receberam ilustrações estáticas originais em duas posições, aprovadas visualmente pelo usuário. Use o filtro **Ilustrações aprovadas (37)** na Biblioteca. O download offline inclui os 37 arquivos locais.
 
-A Beta 1 é adequada para validação. Os 37 casos sem mídia e a conferência visual das candidatas continuam pendentes antes de uma versão estável.
+A Beta 1 é adequada para validação. A aprovação visual das 37 ilustrações foi registrada; a conferência das candidatas externas e a validação biomecânica permanecem separadas dessa aprovação.
 
 ## Arquivos do PWA
 
@@ -44,3 +44,7 @@ Foram verificados os 12 scripts inline, o service worker, os arquivos JSON do PW
 ## Arquivos históricos
 
 `Fork-OpenGym-Fase2-3.patch` permanece como registro do trabalho anterior. Não é necessário para implantar este PWA.
+
+## Beta 1.5.2 · mídias aprovadas
+
+O lote está em `media/approved-37/`, com IDs MD preservados e manifesto de associação. California Press (md414) e Razor Curl (md240) usam as versões refeitas. O shell foi atualizado sem apagar o cache das mídias anteriores.
