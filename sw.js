@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_NAME = 'evolupersonal-md500-offline-v3';
-// Beta 1.1 — correções de backup, PDF e acompanhamento; mantém v3 para preservar a mídia já baixada offline.
+// Beta 1.2 — recuperação de downloads e navegação offline; mantém v3 para preservar a mídia já baixada offline.
 const SCOPE_URL = self.registration.scope;
 const SHELL = ['./index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './training-methods.js', './insights.js', './programs.js', './offline-assets.json', './OFFLINE_CREDITS.md'];
 const ALLOWED_MEDIA_HOSTS = new Set(['gellyfish-ai.github.io', 'raw.githubusercontent.com']);
@@ -16,6 +16,22 @@ function safeExternalURL(value) {
   }
 }
 
+async function fetchExternalMedia(url) {
+  try {
+    const response = await fetch(new Request(url, { mode: 'cors', cache: 'reload' }));
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const type = response.headers.get('Content-Type') || '';
+    if (!type.toLowerCase().startsWith('image/')) throw new Error('A fonte não retornou uma imagem.');
+    return response;
+  } catch (error) {
+    // HTTP and content errors are definitive. Only CORS/network failures may use opaque responses.
+    if (!(error instanceof TypeError)) throw error;
+    const response = await fetch(new Request(url, { mode: 'no-cors', cache: 'reload' }));
+    if (!response.ok && response.type !== 'opaque') throw new Error('HTTP ' + response.status);
+    return response;
+  }
+}
+
 async function cachedExternalResponse(value) {
   const url = safeExternalURL(value);
   if (!url) return new Response('Fonte externa não permitida.', { status: 400 });
@@ -24,7 +40,7 @@ async function cachedExternalResponse(value) {
   const cached = await cache.match(key, { ignoreSearch: true });
   if (cached) return cached;
   try {
-    const response = await fetch(key);
+    const response = await fetchExternalMedia(url);
     if (response.ok || response.type === 'opaque') {
       await cache.put(key, response.clone());
       return response;
@@ -69,6 +85,11 @@ self.addEventListener('fetch', event => {
     }
     try {
       const response = await fetch(request);
+      if (isNavigation && response.status >= 500) {
+        const fallback = await cache.match(request, { ignoreSearch: true })
+          || await cache.match(new URL('./index.html', SCOPE_URL).href);
+        if (fallback) return fallback;
+      }
       if (response.ok && (isNavigation || request.destination === 'script' || request.destination === 'style' || request.destination === 'image' || requestURL.pathname.endsWith('/offline-assets.json') || requestURL.pathname.endsWith('/OFFLINE_CREDITS.md'))) {
         cache.put(request, response.clone()).catch(() => {});
       }
@@ -95,14 +116,18 @@ self.addEventListener('message', event => {
     try {
       const manifestURL = new URL('./offline-assets.json', SCOPE_URL);
       const response = await fetch(manifestURL).catch(() => cache.match(manifestURL));
-      if (!response.ok) throw new Error('Não foi possível obter a lista de mídias.');
+      if (!response?.ok) throw new Error('Não foi possível obter a lista de mídias. Conecte-se para baixar o pacote pela primeira vez.');
       manifest = await response.json();
     } catch (error) {
       port.postMessage({ type: 'ERROR', message: error.message || 'Falha ao ler a lista de mídias.' });
       return;
     }
 
-    const assets = manifest.assets || [];
+    if (!Array.isArray(manifest.assets) || manifest.assets.some(path => typeof path !== 'string')) {
+      port.postMessage({ type: 'ERROR', message: 'A lista de mídias está inválida. Verifique as atualizações.' });
+      return;
+    }
+    const assets = [...new Set(manifest.assets)];
     const localAssets = assets.filter(path => !/^https:\/\//i.test(path));
     const declaredExternal = assets.filter(path => /^https:\/\//i.test(path)).map(safeExternalURL).filter(Boolean);
     const externalURLs = [...new Set([...declaredExternal, ...(event.data.urls || []).map(safeExternalURL).filter(Boolean)])];
@@ -136,11 +161,17 @@ self.addEventListener('message', event => {
       await Promise.all(batch.map(async value => {
         const key = new Request(value, { mode: 'no-cors' });
         try {
-          if (!await cache.match(key)) {
-            const response = await fetch(key);
-            if (!response.ok && response.type !== 'opaque') throw new Error('HTTP ' + response.status);
-            if(response.type === 'opaque') unverified++;
-            await cache.put(key, response);
+          const cached = await cache.match(key);
+          if (!cached || cached.type === 'opaque') {
+            try {
+              const response = await fetchExternalMedia(value);
+              if (response.type === 'opaque') unverified++;
+              await cache.put(key, response);
+            } catch (error) {
+              // Preserve existing offline media when a refresh fails.
+              if (cached) unverified++;
+              throw error;
+            }
           }
         } catch (error) {
           failed.push({ path: value, reason: error.message || 'falha ao baixar fonte externa' });
