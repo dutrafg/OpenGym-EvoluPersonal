@@ -85,3 +85,15 @@ CSV inclui unidade e IDs. O módulo `insights.js` é carregado como fonte única
 
 Testes de lógica/API: `npm test`. Testes de DOM: `npm ci` e `npm run test:dom`.
 Android, HTTPS público e cache real permanecem pendentes. Esta RC está publicada na main e ainda depende da homologação descrita acima.
+
+## Beta 1.8.1 RC · QA local
+
+Corrige falso sucesso no pacote offline ao receber HTML no lugar de imagem e
+rejeita conteúdo inválido nos arquivos críticos da atualização. Foram executados
+22 testes de lógica/API/cache e dois fluxos em DOM simulado.
+
+Auditoria: 37 imagens locais e três ícones válidos; 466 links externos responderam
+200 com MIME de imagem. Ainda há 18 exercícios sem fonte efetiva aprovada, com
+candidatas para revisão. Android, instalação real e acesso remoto público seguem
+pendentes. Portanto esta entrega é uma RC com validação automatizada, não uma
+certificação visual ou de produção.

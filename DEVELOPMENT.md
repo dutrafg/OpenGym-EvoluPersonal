@@ -221,3 +221,34 @@ As pendências de dispositivos das etapas 3 e 4 continuam abertas.
 
 A etapa 5 está implementada para homologação local, não declarada concluída em
 produção. Publicada na main como Beta 1.8 RC, mantendo as pendências descritas acima.
+
+
+## QA da main — Beta 1.8.1 RC
+
+Base: `46745a1cb379548fc7c2dfdbd4b832f942109d95`.
+Na validação adicional, um teste reproduziu falso sucesso no download offline
+quando o servidor retornava HTML com HTTP 200 no lugar de imagem. Corrigido:
+valida Content-Type de mídias locais, ignora cache de imagem inválido e permite
+nova tentativa. Instalação do service worker também rejeita HTML no lugar de JS
+ou conteúdo incompatível nos arquivos críticos, preservando a versão anterior.
+Shell incrementado para `evolupersonal-shell-beta-1.8.1-rc-qa`.
+
+Cinco testes novos cobrem preservação de cache, aplicação explícita da atualização,
+navegação/scripts offline, ausência de cache da API, MIME incorreto e nova tentativa,
+e bloqueio de host externo não permitido. Total: 22 testes de lógica/API/cache,
+além dos dois fluxos de DOM simulado. Isso não equivale a teste em Android real.
+
+Auditoria de arquivos: 37 WebP decodificados, três ícones válidos, scripts presentes,
+503 entradas únicas no manifesto offline. Verificação HTTP HEAD das 466 referências
+externas: todas responderam 200 com tipo image/*; não é revisão visual dos GIFs.
+
+Catálogo: 500 exercícios, 445 GIFs vinculados e 37 ilustrações próprias aprovadas.
+482 exercícios têm uma fonte efetiva selecionada; 18 dependem de aprovar ou corrigir
+uma candidata. Existem 128 candidatas ainda não aprovadas no catálogo completo,
+incluindo exercícios que já possuem outra mídia. Não há exercício sem mídia e sem
+candidato. A aprovação das 37 ilustrações não foi estendida automaticamente às
+fontes externas.
+
+Não foi localizado projeto Vercel ligado a este repositório nas contas/equipes
+acessíveis; a validação de uma publicação ao vivo não foi concluída. Permanecem
+Android, instalação real do PWA e operação pública do serviço remoto.

@@ -1,6 +1,6 @@
 {
   "name": "evolupersonal-pwa",
-  "version": "1.8.0-rc.1",
+  "version": "1.8.1-rc.1",
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.cjs",

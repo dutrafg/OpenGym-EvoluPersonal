@@ -3,7 +3,7 @@
 const CACHE_NAME = 'evolupersonal-md500-offline-v3';
 // Increment SHELL_CACHE on every release, even when only index.html changes.
 // Keep CACHE_NAME stable to preserve downloaded exercise media.
-const SHELL_CACHE = 'evolupersonal-shell-beta-1.8-rc-etapa5';
+const SHELL_CACHE = 'evolupersonal-shell-beta-1.8.1-rc-qa';
 // Beta 1.2 — recuperação de downloads e navegação offline; mantém v3 para preservar a mídia já baixada offline.
 const SCOPE_URL = self.registration.scope;
 const SHELL = ['./index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './training-methods.js', './insights.js', './programs.js', './execution.js', './history-tools.js', './routine-tools.js', './import-analysis.js', './remote-tools.js', './offline-assets.json', './OFFLINE_CREDITS.md'];
@@ -17,6 +17,10 @@ function safeExternalURL(value) {
   } catch (_) {
     return null;
   }
+}
+
+function imageResponse(response) {
+  return !!response && (response.type === 'opaque' || (response.headers.get('Content-Type') || '').toLowerCase().startsWith('image/'));
 }
 
 async function fetchExternalMedia(url) {
@@ -41,7 +45,7 @@ async function cachedExternalResponse(value) {
   const cache = await caches.open(CACHE_NAME);
   const key = new Request(url, { mode: 'no-cors' });
   const cached = await cache.match(key, { ignoreSearch: true });
-  if (cached) return cached;
+  if (imageResponse(cached)) return cached;
   try {
     const response = await fetchExternalMedia(url);
     if (response.ok || response.type === 'opaque') {
@@ -56,6 +60,16 @@ self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL_CACHE);
     await cache.addAll(SHELL.map(path => new Request(new URL(path, SCOPE_URL), { cache: 'reload' })));
+    for (const path of SHELL) {
+      const response = await cache.match(new URL(path, SCOPE_URL).href);
+      const type = (response?.headers.get('Content-Type') || '').toLowerCase();
+      if (!response || path.endsWith('.js') && !/(javascript|ecmascript)/.test(type)
+        || path.endsWith('.html') && !type.startsWith('text/html')
+        || /\.(?:json|webmanifest)$/.test(path) && !type.includes('json')
+        || /\.(?:png|webp|gif)$/.test(path) && !imageResponse(response)) {
+        throw new Error('Arquivo do aplicativo com conteúdo inválido: ' + path);
+      }
+    }
   })());
 });
 
@@ -89,10 +103,13 @@ self.addEventListener('fetch', event => {
     }
     if (!isNavigation) {
       const cached = await cache.match(request, { ignoreSearch: true });
-      if (cached) return cached;
+      if (cached && (request.destination !== 'image' || imageResponse(cached))) return cached;
     }
     try {
       const response = await fetch(request);
+      if (request.destination === 'image' && response.ok && !imageResponse(response)) {
+        return new Response('O arquivo recebido não é uma imagem.', { status: 502 });
+      }
       if (isNavigation && response.status >= 500) {
         const fallback = await cache.match(request, { ignoreSearch: true })
           || await cache.match(new URL('./index.html', SCOPE_URL).href);
@@ -105,7 +122,7 @@ self.addEventListener('fetch', event => {
     } catch (_) {
       const fallback = await cache.match(request, { ignoreSearch: true })
         || (isNavigation ? await cache.match(new URL('./index.html', SCOPE_URL).href) : null);
-      if (fallback) return fallback;
+      if (fallback && (request.destination !== 'image' || imageResponse(fallback))) return fallback;
       return new Response('Este arquivo ainda não foi baixado para uso offline.', {
         status: 503,
         headers: { 'Content-Type': 'text/plain; charset=utf-8' }
@@ -150,9 +167,10 @@ self.addEventListener('message', event => {
       await Promise.all(batch.map(async path => {
         const url = new URL(path, SCOPE_URL).href;
         try {
-          if (!await cache.match(url)) {
+          if (!imageResponse(await cache.match(url))) {
             const response = await fetch(url, { cache: 'reload' });
             if (!response.ok) throw new Error('HTTP ' + response.status);
+            if (!imageResponse(response)) throw new Error('O arquivo recebido não é uma imagem.');
             await cache.put(url, response);
           }
         } catch (error) {
@@ -170,7 +188,7 @@ self.addEventListener('message', event => {
         const key = new Request(value, { mode: 'no-cors' });
         try {
           const cached = await cache.match(key);
-          if (!cached || cached.type === 'opaque') {
+          if (!imageResponse(cached) || cached.type === 'opaque') {
             try {
               const response = await fetchExternalMedia(value);
               if (response.type === 'opaque') unverified++;
