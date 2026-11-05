@@ -126,7 +126,7 @@
         r.reps = r.durationSeconds + ' s' + (r.executionMode === 'cardio' ? ' · ' + (r.distanceKm || 0) + ' km' : '');
       } else {
         r.reps = String(values['reps' + i] || '').trim();
-        if (!r.reps || r.reps.length > 40) throw Error('Informe as repetições da série.');
+        if (!('left' + i in values) && (!/^\d+$/.test(r.reps) || Number(r.reps) < 1 || Number(r.reps) > 500)) throw Error('Informe repetições inteiras de 1 a 500.');
         if ('left' + i in values) {
           r.left = String(num('left' + i, 500, true) ?? '');
           r.right = String(num('right' + i, 500, true) ?? '');
