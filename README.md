@@ -84,4 +84,4 @@ e validação de prescrições avançadas. Evolução agora oferece unidade do r
 CSV inclui unidade e IDs. O módulo `insights.js` é carregado como fonte única.
 
 Testes de lógica/API: `npm test`. Testes de DOM: `npm ci` e `npm run test:dom`.
-Android, HTTPS público e cache real permanecem pendentes. Esta RC não está na main.
+Android, HTTPS público e cache real permanecem pendentes. Esta RC está publicada na main e ainda depende da homologação descrita acima.

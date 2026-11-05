@@ -102,8 +102,7 @@ rollback em falha de gravação e rejeição de prescrição avançada inválida
 
 Pendente: validação visual e fluxo em navegador real, em especial Android, antes
 de declarar a etapa concluída. DOM simulado não comprova layout, download do
-arquivo, instalação PWA ou cache real. A RC fica em branch de desenvolvimento;
-a main permanece na Beta 1.5.2 das 37 mídias aprovadas.
+arquivo, instalação PWA ou cache real. A implementação está consolidada na Beta 1.8 RC, mantendo a pendência de homologação em dispositivos.
 
 
 ## Etapa 4 — Beta 1.7 RC (primeira entrega)
@@ -154,7 +153,7 @@ A etapa 4 está iniciada, não encerrada. Permanecem a homologação visual em A
 o fluxo de arquivos em navegador real, o cache offline real e testes com arquivos
 reais de terceiros (os testes atuais usam exemplos controlados). A pendência de
 Android da etapa 3 não foi considerada concluída para iniciar esta implementação.
-A main permanece na Beta 1.5.2; o trabalho das etapas 3/4 está em branches.
+A implementação das etapas 3/4 foi consolidada na Beta 1.8 RC; as pendências de homologação continuam abertas.
 
 
 ## Etapa 5 — Beta 1.8 RC e revisão posterior
@@ -221,4 +220,4 @@ criptografia em repouso. Não há sincronização de exclusões/edições ou mul
 As pendências de dispositivos das etapas 3 e 4 continuam abertas.
 
 A etapa 5 está implementada para homologação local, não declarada concluída em
-produção. A main permanece na Beta 1.5.2; esta entrega fica em branch própria.
+produção. Publicada na main como Beta 1.8 RC, mantendo as pendências descritas acima.
