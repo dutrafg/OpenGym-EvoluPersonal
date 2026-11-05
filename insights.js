@@ -36,9 +36,9 @@
       if (['aquecimento', 'feeder'].includes(record.type)) continue;
       const sideReps = Number(record.left) > 0 && Number(record.right) > 0 ? Number(record.left) + Number(record.right) : null;
       const reps = strength ? sideReps ?? actualReps(record.reps) : null, load=strength?number(record.load):(number(record.load)??0);
-      if(load===null||load<0||load>2000)continue;
+      if(load!==null&&(load<0||load>2000))continue;
       const blockVolume = strength ? (record.blocks || []).reduce((total, b) => total + (number(b?.load) || 0) * (actualReps(b?.reps) || 0), 0) : 0;
-      const volume = reps === null ? 0 : Math.round((load * reps + blockVolume) * 100) / 100;
+      const volume = !strength?0:reps===null||load===null?null: Math.round((load * reps + blockVolume) * 100) / 100;
       rows.push({
         session:session.id,student:session.student,title:session.title,date:session.date,
         timestamp:session.timestamp,exercise:String(record.exercise||''),
@@ -55,19 +55,19 @@
     const d=new Date(timestamp),day=d.getUTCDay();
     return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()-(day+6)%7)).toISOString().slice(0,10);
   }
-  function aggregate(db,studentId='all',now=Date.now()){
+  function aggregate(db,studentId='all',now=Date.now(),volumeUnit='kg total'){
     const {sessions,rows}=completedRows(db,studentId);
     const exerciseMap=new Map(),history=new Map();
-    let totalVolume=0,personalRecords=0,loggedSets=0;
+    let totalVolume=0,personalRecords=0,loggedSets=0;const volumesByUnit={};
     for(const row of rows){
-      totalVolume+=row.volume;
+      const selected=row.unit===volumeUnit,volume=selected?(row.volume||0):0;totalVolume+=volume;if(row.volume!==null)volumesByUnit[row.unit]=(volumesByUnit[row.unit]||0)+row.volume;
       loggedSets++;
       const key=row.exercise||row.name;
       let item=exerciseMap.get(key);
       if(!item){item={id:key,name:row.name,sets:0,volume:0,bestLoad:0,best1RM:null,personalRecords:0,lastDate:null};exerciseMap.set(key,item)}
-      item.sets++;item.volume+=row.volume;item.bestLoad=Math.max(item.bestLoad,row.load);
+      item.sets++;item.volume+=volume;if(selected)item.bestLoad=Math.max(item.bestLoad,row.load||0);
       item.lastDate=row.date;
-      if(row.estimated1RM!==null){
+      if(selected&&row.estimated1RM!==null){
         const prev=history.get(key);
         if(prev===undefined||row.estimated1RM>prev){
           history.set(key,row.estimated1RM);
@@ -84,13 +84,13 @@
     });
     const byWeek=new Map(weeks.map(w=>[w.start,w]));
     for(const s of sessions){const bucket=byWeek.get(mondayUTC(s.timestamp));if(bucket)bucket.sessions++}
-    for(const row of rows){const bucket=byWeek.get(mondayUTC(row.timestamp));if(bucket){bucket.volume+=row.volume;bucket.sets++}}
+    for(const row of rows){const bucket=byWeek.get(mondayUTC(row.timestamp));if(bucket){if(row.unit===volumeUnit)bucket.volume+=row.volume||0;bucket.sets++}}
     for(const w of weeks)w.volume=Math.round(w.volume*100)/100;
     const exercises=[...exerciseMap.values()].map(e=>({...e,volume:Math.round(e.volume*100)/100}))
       .sort((a,b)=>b.volume-a.volume||a.name.localeCompare(b.name,'pt-BR'));
     return {
       studentId,sessions:sessions.length,loggedSets,
-      totalVolume:Math.round(totalVolume*100)/100,personalRecords,
+      totalVolume:Math.round(totalVolume*100)/100,volumeUnit,volumesByUnit,personalRecords,
       exercises,weeks,rows,
       latestSessions:sessions.slice().reverse().slice(0,8)
     };
@@ -102,9 +102,9 @@
     return '"'+v.replace(/"/g,'""')+'"';
   }
   function exportCSV(data){
-    const headers=['Data','Aluno','Treino','Exercício','Série','Carga (kg)','Repetições','Volume (kg)','1RM estimada (kg)','Modo','Duração (s)','Distância (km)','Blocos adicionais'];
+    const headers=['Data','Aluno','Treino','Exercício','Série','Carga informada','Repetições','Volume (carga × repetições)','1RM estimada (unidade da carga)','Modo','Duração (s)','Distância (km)','Blocos adicionais','ID do exercício','Unidade','Tipo de série','ID da sessão'];
     const rows=(data.rows||[]).map(r=>[
-      r.date,r.student,r.title,r.name,r.set,r.load,r.reps===null?'':r.reps,r.volume,r.estimated1RM===null?'':r.estimated1RM,r.executionMode,r.durationSeconds,r.distanceKm,JSON.stringify(r.blocks)
+      r.date,r.student,r.title,r.name,r.set,r.load,r.reps===null?'':r.reps,r.volume,r.estimated1RM===null?'':r.estimated1RM,r.executionMode,r.durationSeconds,r.distanceKm,JSON.stringify(r.blocks),r.exercise,r.unit,r.type,r.session
     ]);
     return '\uFEFF'+[headers,...rows].map(row=>row.map(csvSafe).join(';')).join('\r\n');
   }

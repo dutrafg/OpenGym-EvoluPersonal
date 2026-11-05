@@ -1,7 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const tools=require('../routine-tools.js');
-const item={exercise:'md1',sets:3,reps:'8–12',load:50,rest:60,unit:'kg total',supersetNext:true,setPlan:[{type:'trabalho',mode:'fixed',load:50,reps:'8–12',rest:60,percent:100,reference:'base',rir:2}],progression:{criterion:'all',scheme:'double',min:8,max:12,increment:2.5}};
+const item={exercise:'md1',sets:1,reps:'8–12',load:50,rest:60,unit:'kg total',supersetNext:true,setPlan:[{type:'trabalho',mode:'fixed',load:50,reps:'8–12',rest:60,percent:100,reference:'base',rir:2}],progression:{criterion:'all',scheme:'double',min:8,max:12,increment:2.5}};
 const data=()=>({students:[{id:'s1',name:'Nome privado',email:'privado@example.com'}],exercises:[{id:'md1'}],workouts:[{id:'w1',student:'s1',title:'Treino A',notes:'Orientações',items:[structuredClone(item)]}],sessions:[{id:'privado'}],favorites:['md1'],equipment:tools.defaultEquipment()});
 test('favoritos mantêm a ordem dos grupos e não alteram o catálogo',()=>{
  const list=[{id:'md1'},{id:'md2'},{id:'md3'}];assert.deepEqual(tools.orderFavorites(list,['md3','md1']),[list[0],list[2],list[1]]);assert.equal(list[0].id,'md1');

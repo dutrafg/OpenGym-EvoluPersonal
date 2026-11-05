@@ -1,0 +1,27 @@
+const {JSDOM,VirtualConsole}=require('jsdom');
+const {createRemoteServer}=require('../remote-server/server.cjs');
+const assert=require('node:assert/strict'),fs=require('fs'),os=require('os'),path=require('path'),crypto=require('crypto');
+(async()=>{
+ const folder=fs.mkdtempSync(path.join(os.tmpdir(),'ep-student-ui-')),token='test_'+ 'a'.repeat(40),server=createRemoteServer({token,file:path.join(folder,'state.json')});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const base='http://127.0.0.1:'+server.address().port;
+ const coach=async(route,method='GET',body)=>{const res=await fetch(base+route,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});return res.json();};
+ await coach('/api/coach/students/s1','PUT',{baseRevision:0,profile:{name:'Aluno UI'},names:{md1:'Supino'},bundle:{format:'evolupersonal-routines',version:1,routines:[{title:'Treino teste',notes:'',items:[{exercise:'md1',sets:1,reps:'10',load:20,rest:60,unit:'kg total'}]}]}});
+ const invite=await coach('/api/coach/students/s1/invite','POST',{});let offline=false;const errors=[],vc=new VirtualConsole();vc.on('jsdomError',error=>errors.push(error.message));
+ const dom=await JSDOM.fromURL(base+'/student/#invite='+invite.token,{runScripts:'dangerously',resources:'usable',pretendToBeVisual:true,virtualConsole:vc,beforeParse(w){w.structuredClone=structuredClone;w.AbortSignal=AbortSignal;w.fetch=(url,opts)=>offline?Promise.reject(Error('offline simulada')):fetch(new URL(url,base),opts);w.confirm=()=>true;Object.defineProperty(w.crypto,'randomUUID',{value:crypto.randomUUID});}});
+ const w=dom.window;await new Promise(resolve=>w.addEventListener('load',resolve));
+ const until=async(fn)=>{for(let n=0;n<100;n++){if(fn())return;await new Promise(resolve=>setTimeout(resolve,10));}throw Error('Timeout: '+w.document.getElementById('status').textContent);};
+ await until(()=>w.document.getElementById('start'));
+ assert.equal(w.location.hash,'');assert.equal(w.sessionStorage.getItem('ep.student.invite'),invite.token);
+ w.document.getElementById('start').click();const form=w.document.getElementById('session');form.elements.reps0_0.value='10';form.elements.done0_0.checked=true;form.dispatchEvent(new w.Event('input',{bubbles:true}));
+ const draft=w.localStorage.getItem('ep.remote.student.v1');assert.equal(JSON.parse(draft).draft.fields.reps0_0,'10');
+ const restored=await JSDOM.fromURL(base+'/student/',{runScripts:'dangerously',resources:'usable',pretendToBeVisual:true,virtualConsole:vc,beforeParse(win){win.structuredClone=structuredClone;win.AbortSignal=AbortSignal;win.fetch=()=>Promise.reject(Error('offline simulada'));win.confirm=()=>true;Object.defineProperty(win.crypto,'randomUUID',{value:crypto.randomUUID});win.localStorage.setItem('ep.remote.student.v1',draft);win.sessionStorage.setItem('ep.student.invite',invite.token);}});
+ await new Promise(resolve=>restored.window.addEventListener('load',resolve));restored.window.document.getElementById('resume').click();assert.equal(restored.window.document.getElementById('session').elements.reps0_0.value,'10');restored.window.close();
+ offline=true;
+ form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>w.document.getElementById('status').textContent.includes('offline simulada'));
+ assert.equal(JSON.parse(w.localStorage.getItem('ep.remote.student.v1')).queue.length,1);
+ offline=false;w.document.getElementById('sync').click();await until(()=>JSON.parse(w.localStorage.getItem('ep.remote.student.v1')).queue.length===0);
+ const stored=await coach('/api/coach/students/s1/sessions');assert.equal(stored.sessions.length,1);assert.equal(stored.sessions[0].records[0].reps,'10');
+ w.document.getElementById('sync').click();await until(()=>!w.document.getElementById('sync').disabled);assert.equal((await coach('/api/coach/students/s1/sessions')).sessions.length,1);
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({studentUI:true,draftRestoredAfterReload:true,invitationRemovedFromURL:true,offlineQueuePersisted:true,realAPISync:true,noDuplicateOnRetry:true,errors}));
+ w.close();await new Promise(resolve=>server.close(resolve));fs.rmSync(folder,{recursive:true,force:true});
+})().catch(error=>{console.error(error);process.exit(1)});

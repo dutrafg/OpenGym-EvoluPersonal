@@ -124,7 +124,7 @@
 }
 @media(prefers-reduced-motion:reduce){.rail{scroll-behavior:auto!important}}
 </style></head><body>
-<div class="shell"><nav class="rail" aria-label="Navegação principal"><div class="brand">e</div><div id="nav" style="display:contents"></div><button class="bottom" id="themeRail" aria-label="Alternar tema"></button></nav><main class="main"><header class="top"><div class="row"><div class="wordmark">evolu<span>personal</span></div><span class="tag">BETA 1.7 RC · ETAPA 4 · VERSÃO DE TESTE</span></div><div class="tools"><button id="modeBtn"></button><button id="themeBtn" aria-label="Alternar tema"></button></div></header><div id="app"><section class="notice" id="appBootFallback"><strong>Carregando a prévia do EvoluPersonal…</strong><p style="margin:6px 0 0">Se esta mensagem continuar, o navegador bloqueou ou interrompeu o JavaScript. Abra a versão corrigida em um navegador com JavaScript habilitado.</p></section></div><footer class="foot">EvoluPersonal · Beta 1.7 RC · Etapa 4</footer></main></div>
+<div class="shell"><nav class="rail" aria-label="Navegação principal"><div class="brand">e</div><div id="nav" style="display:contents"></div><button class="bottom" id="themeRail" aria-label="Alternar tema"></button></nav><main class="main"><header class="top"><div class="row"><div class="wordmark">evolu<span>personal</span></div><span class="tag">BETA 1.8 RC · ETAPA 5 · VERSÃO DE TESTE</span></div><div class="tools"><button id="modeBtn"></button><button id="themeBtn" aria-label="Alternar tema"></button></div></header><div id="app"><section class="notice" id="appBootFallback"><strong>Carregando a prévia do EvoluPersonal…</strong><p style="margin:6px 0 0">Se esta mensagem continuar, o navegador bloqueou ou interrompeu o JavaScript. Abra a versão corrigida em um navegador com JavaScript habilitado.</p></section></div><footer class="foot">EvoluPersonal · Beta 1.8 RC · Etapa 5</footer></main></div>
 <dialog id="modal"><div class="between"><h2 id="modalTitle"></h2><button class="quiet" onclick="closeModal()" aria-label="Fechar janela">✕</button></div><div class="modalbody" id="modalBody"></div></dialog><div id="toast" role="status" hidden></div><div id="timer" hidden><small>DESCANSO</small><b id="clock">00:00</b><div class="row"><button onclick="pauseTimer()" id="pauseBtn">Pausar</button><button onclick="stopTimer()">Encerrar</button></div></div>
 <script>
 'use strict';
@@ -327,120 +327,7 @@ function addItem(){const i={exercise:document.getElementById('exercisePick').val
 function showSession(id){const s=db.sessions.find(s=>s.id===id);if(!s)return;openModal('Registro da sessão','<h3>'+esc(s.title)+'</h3><p>'+date(s.date)+'</p>'+s.records.map(r=>'<div class="exrow"><strong>'+esc(r.name)+' · '+r.set+' · '+esc(SERIES_TYPES[r.type||'trabalho'])+'</strong><p>Carga realizada: '+(r.load??'não definida')+' '+esc(r.unit||'kg total')+' · '+esc(r.reps)+' repetições / tempo'+(r.rir==null?'':' · RIR '+r.rir)+'</p>'+(r.plannedReps?'<small>Meta: '+esc(r.plannedReps)+' · carga planejada: '+(r.plannedLoad??'não definida')+'</small>':'')+'</div>').join('')+(s.suggestions?.length?'<h3>Sugestões para revisão do personal</h3>'+s.suggestions.map(t=>'<p>'+esc(t)+'</p>').join(''):'')+'<p>'+esc(s.feedback||'')+'</p>',true);}
 
 </script>
-<script>
-/* EvoluPersonal — indicadores locais de treino, implementação independente.
-   Nenhuma imagem, animação ou trecho de código do openGym é utilizado aqui.
-   API pura: analisa somente as sessões já persistidas no EvoluPersonal (v2). */
-(function(root,factory){
-  const api=factory();
-  if(typeof module==='object'&&module.exports)module.exports=api;
-  if(root)root.EvoluInsights=api;
-})(typeof globalThis!=='undefined'?globalThis:this,function(){
-  'use strict';
-  function number(x){return typeof x==='number'&&Number.isFinite(x)?x:null}
-  function actualReps(value){
-    if(typeof value==='number'&&Number.isInteger(value)&&value>=0&&value<=500)return value;
-    if(typeof value==='string'&&/^\s*\d{1,3}\s*$/.test(value)){const n=Number(value.trim());return n<=500?n:null}
-    return null; // Não transformar metas como "8-12" em execuções efetivas.
-  }
-  function estimated1RM(weight,reps){
-    const load=number(weight),n=actualReps(reps);
-    if(load===null||load<=0||n===null||n<1||n>12)return null;
-    return Math.round(load*(1+n/30)*10)/10;
-  }
-  function normalizeSession(s){
-    const stamp=Date.parse(s?.date);
-    if(!s||!Number.isFinite(stamp)||!Array.isArray(s.records))return null;
-    return {id:String(s.id||''),student:String(s.student||''),title:String(s.title||'Treino'),workout:s.workout,date:s.date,timestamp:stamp,records:s.records};
-  }
-  function completedRows(db,studentId){
-    const sessions=(Array.isArray(db?.sessions)?db.sessions:[]).map(normalizeSession).filter(Boolean)
-      .filter(s=>studentId==='all'||!studentId||s.student===studentId)
-      .sort((a,b)=>a.timestamp-b.timestamp||a.id.localeCompare(b.id));
-    const rows=[];
-    for(const session of sessions)for(const record of session.records){
-      if(!record||record.done!==true)continue;
-      const item = db.workouts?.find(w => w.id === session.workout)?.items?.[record.item];
-      const mode = record.executionMode || item?.executionMode || 'reps';
-      const strength = mode === 'reps';
-      if (['aquecimento', 'feeder'].includes(record.type)) continue;
-      const sideReps = Number(record.left) > 0 && Number(record.right) > 0 ? Number(record.left) + Number(record.right) : null;
-      const reps = strength ? sideReps ?? actualReps(record.reps) : null, load=strength?number(record.load):(number(record.load)??0);
-      if(load===null||load<0||load>2000)continue;
-      const blockVolume = strength ? (record.blocks || []).reduce((total, b) => total + (number(b?.load) || 0) * (actualReps(b?.reps) || 0), 0) : 0;
-      const volume = reps === null ? 0 : Math.round((load * reps + blockVolume) * 100) / 100;
-      rows.push({
-        session:session.id,student:session.student,title:session.title,date:session.date,
-        timestamp:session.timestamp,exercise:String(record.exercise||''),
-        name:String(record.name||'Exercício'),set:record.set,load,reps,
-        volume,estimated1RM:strength && !['drop','restpause'].includes(record.type) && sideReps === null ? estimated1RM(load,reps) : null,
-        executionMode:mode,durationSeconds:number(record.durationSeconds),distanceKm:number(record.distanceKm),
-        blocks:record.blocks || [],
-        unit:String(record.unit||'kg total'),type:String(record.type||'trabalho')
-      });
-    }
-    return {sessions,rows};
-  }
-  function mondayUTC(timestamp){
-    const d=new Date(timestamp),day=d.getUTCDay();
-    return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()-(day+6)%7)).toISOString().slice(0,10);
-  }
-  function aggregate(db,studentId='all',now=Date.now()){
-    const {sessions,rows}=completedRows(db,studentId);
-    const exerciseMap=new Map(),history=new Map();
-    let totalVolume=0,personalRecords=0,loggedSets=0;
-    for(const row of rows){
-      totalVolume+=row.volume;
-      loggedSets++;
-      const key=row.exercise||row.name;
-      let item=exerciseMap.get(key);
-      if(!item){item={id:key,name:row.name,sets:0,volume:0,bestLoad:0,best1RM:null,personalRecords:0,lastDate:null};exerciseMap.set(key,item)}
-      item.sets++;item.volume+=row.volume;item.bestLoad=Math.max(item.bestLoad,row.load);
-      item.lastDate=row.date;
-      if(row.estimated1RM!==null){
-        const prev=history.get(key);
-        if(prev===undefined||row.estimated1RM>prev){
-          history.set(key,row.estimated1RM);
-          item.personalRecords++;personalRecords++;
-        }
-        item.best1RM=Math.max(item.best1RM||0,row.estimated1RM);
-      }
-    }
-    const anchor=Number.isFinite(Number(now))?Number(now):Date.now();
-    const currentMonday=Date.parse(mondayUTC(anchor)+'T00:00:00Z');
-    const weeks=Array.from({length:8},(_,i)=>{
-      const d=new Date(currentMonday-(7-i)*7*86400000);
-      return {start:d.toISOString().slice(0,10),sessions:0,volume:0,sets:0};
-    });
-    const byWeek=new Map(weeks.map(w=>[w.start,w]));
-    for(const s of sessions){const bucket=byWeek.get(mondayUTC(s.timestamp));if(bucket)bucket.sessions++}
-    for(const row of rows){const bucket=byWeek.get(mondayUTC(row.timestamp));if(bucket){bucket.volume+=row.volume;bucket.sets++}}
-    for(const w of weeks)w.volume=Math.round(w.volume*100)/100;
-    const exercises=[...exerciseMap.values()].map(e=>({...e,volume:Math.round(e.volume*100)/100}))
-      .sort((a,b)=>b.volume-a.volume||a.name.localeCompare(b.name,'pt-BR'));
-    return {
-      studentId,sessions:sessions.length,loggedSets,
-      totalVolume:Math.round(totalVolume*100)/100,personalRecords,
-      exercises,weeks,rows,
-      latestSessions:sessions.slice().reverse().slice(0,8)
-    };
-  }
-  function csvSafe(value){
-    let v=String(value===null||value===undefined?'':value).replace(/\r\n?/g,'\n');
-    // Impede execução de fórmulas no Excel/Calc com dados fornecidos por usuários.
-    if(/^[\s\u0000-\u001f]*[=+\-@\t]/.test(v))v="'"+v;
-    return '"'+v.replace(/"/g,'""')+'"';
-  }
-  function exportCSV(data){
-    const headers=['Data','Aluno','Treino','Exercício','Série','Carga (kg)','Repetições','Volume (kg)','1RM estimada (kg)','Modo','Duração (s)','Distância (km)','Blocos adicionais','ID do exercício','Unidade','Tipo de série','ID da sessão'];
-    const rows=(data.rows||[]).map(r=>[
-      r.date,r.student,r.title,r.name,r.set,r.load,r.reps===null?'':r.reps,r.volume,r.estimated1RM===null?'':r.estimated1RM,r.executionMode,r.durationSeconds,r.distanceKm,JSON.stringify(r.blocks),r.exercise,r.unit,r.type,r.session
-    ]);
-    return '\uFEFF'+[headers,...rows].map(row=>row.map(csvSafe).join(';')).join('\r\n');
-  }
-  return Object.freeze({actualReps,estimated1RM,completedRows,aggregate,exportCSV,mondayUTC});
-});
-</script>
+<script src="./insights.js"></script>
 <script>
 'use strict';
 const VERSION=2,KEY='evolupersonal.alpha1';
@@ -635,7 +522,7 @@ if(d.weekPlan!==undefined){
  return Object.entries(d.drafts).every(([key,x])=>{const w=d.workouts.find(w=>w.id===key);return w&&x&&records(x.records)&&x.records.length===w.items.reduce((a,i)=>a+i.sets,0)&&x.records.every(r=>(x.substitutions?.[r.item]||w.items[r.item]?.exercise)===r.exercise&&r.set<=w.items[r.item].sets)})
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch(e){toast('Não foi possível salvar. Exporte um backup antes de fechar.');return false}}
-let insightStudent='all',insightExercise='',insightMuscle='all',studentProgramId='',studentSlot='A',activeStudentWorkout='',planStudent='',weeklyOpen=true,rotationOpen=true,weekScheduleOffset=0;
+let insightVolumeUnit='kg total',insightStudent='all',insightExercise='',insightMuscle='all',studentProgramId='',studentSlot='A',activeStudentWorkout='',planStudent='',weeklyOpen=true,rotationOpen=true,weekScheduleOffset=0;
 let page='home',mode='coach',selected=db.students[0]?.id||'',search='',workSearch='',libSearch='',group='',mdLibraryStatus='all',mdLibraryPage=0,editor=null,toastHandle;
 const student=id=>db.students.find(s=>s.id===id),exercise=id=>db.exercises.find(e=>e.id===id);
 const initials=name=>name.split(' ').filter(Boolean).slice(0,2).map(s=>s[0]).join('');
@@ -1005,20 +892,20 @@ function insightMap(rows){const c=insightCounts(rows),max=Math.max(1,...Object.v
 function pickInsightMuscle(g){insightMuscle=g;insightExercise='';render()}
 function insightsView(){
  const model=window.EvoluInsights;if(!model)return heading('ANÁLISES','Evolução de treinos','O módulo não foi carregado.')+'<div class="notice">Confirme se insights.js está junto ao index.html.</div>';if(insightStudent!=='all'&&!student(insightStudent))insightStudent='all';
- const data=model.aggregate(db,insightStudent),fmt=x=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(x),choices='<option value="all">Todos os alunos</option>'+db.students.map(s=>'<option value="'+esc(s.id)+'" '+(insightStudent===s.id?'selected':'')+'>'+esc(s.name)+'</option>').join(''),max=Math.max(1,...data.weeks.map(w=>w.volume));
- const bars=data.weeks.map(w=>'<div class="insight-week"><b>'+fmt(w.volume)+'</b><div class="insight-track" title="'+fmt(w.volume)+' kg na semana de '+esc(w.start)+'"><div class="insight-fill" style="height:'+Math.round(w.volume/max*100)+'%"></div></div><span>'+esc(w.start.slice(5).replace('-','/'))+'</span></div>').join('');
+ const data=model.aggregate(db,insightStudent,Date.now(),insightVolumeUnit),fmt=x=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(x),choices='<option value="all">Todos os alunos</option>'+db.students.map(s=>'<option value="'+esc(s.id)+'" '+(insightStudent===s.id?'selected':'')+'>'+esc(s.name)+'</option>').join(''),max=Math.max(1,...data.weeks.map(w=>w.volume));
+ const bars=data.weeks.map(w=>'<div class="insight-week"><b>'+fmt(w.volume)+'</b><div class="insight-track" title="'+fmt(w.volume)+' '+esc(data.volumeUnit)+' × repetições na semana de '+esc(w.start)+'"><div class="insight-fill" style="height:'+Math.round(w.volume/max*100)+'%"></div></div><span>'+esc(w.start.slice(5).replace('-','/'))+'</span></div>').join('');
  const filtered=data.exercises.filter(x=>insightMuscle==='all'||data.rows.some(r=>(r.exercise===x.id||r.name===x.name)&&insightGroup(r)===insightMuscle));if(!filtered.some(x=>x.id===insightExercise))insightExercise=filtered[0]?.id||'';
  const rows=data.rows.filter(r=>r.exercise===insightExercise||r.name===insightExercise),options=filtered.map(x=>'<option value="'+esc(x.id)+'" '+(x.id===insightExercise?'selected':'')+'>'+esc(x.name)+'</option>').join(''),items=filtered.slice(0,15).map(e=>'<tr><td>'+esc(e.name)+'</td><td>'+fmt(e.sets)+'</td><td>'+fmt(e.volume)+'</td><td>'+(e.best1RM===null?'—':fmt(e.best1RM))+'</td></tr>').join(''),sessions=data.latestSessions.map(x=>'<div class="listrow"><div><strong>'+esc(x.title)+'</strong><p>'+esc(student(x.student)?.name||'Aluno')+' · '+date(x.date)+'</p></div><button onclick="showSession(\''+esc(x.id)+'\')">Ver</button></div>').join('');
- return heading('ACOMPANHAMENTO','Evolução de treinos','Indicadores locais do aluno por sessão e grupo muscular.','<button class="primary" onclick="exportInsights()">Exportar CSV</button>')+'<div class="card"><label style="max-width:360px">Filtrar aluno<select aria-label="Selecionar aluno da evolução" onchange="insightStudent=this.value;insightExercise=\'\';insightMuscle=\'all\';render()">'+choices+'</select></label><p class="muted" style="margin:10px 0 0">A linha mostra a maior carga registrada em uma série por sessão. A estimativa de 1RM usa séries concluídas de 1 a 12 repetições.</p></div>'+
- '<div class="insight-kpis"><div class="insight-kpi"><span class="muted">Sessões concluídas</span><strong>'+fmt(data.sessions)+'</strong><small>Com registro histórico</small></div><div class="insight-kpi"><span class="muted">Séries registradas</span><strong>'+fmt(data.loggedSets)+'</strong><small>Séries concluídas</small></div><div class="insight-kpi"><span class="muted">Volume registrado</span><strong>'+fmt(data.totalVolume)+' kg</strong><small>Carga × repetições válidas</small></div><div class="insight-kpi"><span class="muted">Novos máximos estimados</span><strong>'+fmt(data.personalRecords)+'</strong><small>Progressões por exercício</small></div></div>'+
+ return heading('ACOMPANHAMENTO','Evolução de treinos','Indicadores locais do aluno por sessão e grupo muscular.','<button class="primary" onclick="exportInsights()">Exportar CSV</button>')+'<div class="card"><label style="max-width:360px">Filtrar aluno<select aria-label="Selecionar aluno da evolução" onchange="insightStudent=this.value;insightExercise=\'\';insightMuscle=\'all\';render()">'+choices+'</select></label><label style="max-width:360px">Unidade do resumo de volume<select onchange="insightVolumeUnit=this.value;render()">'+LOAD_UNITS.map(unit=>'<option '+(unit===insightVolumeUnit?'selected':'')+'>'+esc(unit)+'</option>').join('')+'</select></label><p class="muted" style="margin:10px 0 0">A linha mostra a maior carga registrada em uma série por sessão. A estimativa de 1RM usa séries concluídas de 1 a 12 repetições.</p></div>'+
+ '<div class="insight-kpis"><div class="insight-kpi"><span class="muted">Sessões concluídas</span><strong>'+fmt(data.sessions)+'</strong><small>Com registro histórico</small></div><div class="insight-kpi"><span class="muted">Séries registradas</span><strong>'+fmt(data.loggedSets)+'</strong><small>Séries concluídas</small></div><div class="insight-kpi"><span class="muted">Volume registrado</span><strong>'+fmt(data.totalVolume)+'</strong><small>Carga × repetições · '+esc(data.volumeUnit)+'</small></div><div class="insight-kpi"><span class="muted">Novos máximos estimados</span><strong>'+fmt(data.personalRecords)+'</strong><small>Progressões por exercício</small></div></div>'+
  '<div class="cols"><section class="card"><h2>Volume nas últimas 8 semanas</h2>'+(data.sessions?'<div class="insight-chart" role="img" aria-label="Volume semanal de treino">'+bars+'</div>':'<div class="insight-empty">Conclua uma sessão para visualizar o volume.</div>')+'</section><section class="card"><h2>Sessões recentes</h2>'+(sessions||'<div class="insight-empty">Nenhuma sessão concluída.</div>')+'</section></div>'+
  (window.epHistoryChart?epHistoryChart(data):'<section class="card section"><div class="between"><div><h2>Progressão de carga</h2><p class="muted">Maior peso de uma série em cada sessão.</p></div><label style="max-width:330px">Exercício<select onchange="insightExercise=this.value;render()">'+(options||'<option>Sem exercícios registrados</option>')+'</select></label></div>'+insightLoadSVG(rows)+'</section>')+
  '<section class="card section"><div class="between"><div><h2>Mapa muscular</h2><p class="muted">Séries concluídas por grupo principal do exercício.</p></div><span class="tag">Toque em uma região</span></div>'+insightMap(data.rows)+'</section>'+
- '<section class="card section"><div class="between"><h2>Exercícios com mais volume</h2><span class="tag">'+filtered.length+' exercícios registrados</span></div>'+(items?'<div class="insight-scroll"><table class="insight-table"><thead><tr><th>Exercício</th><th>Séries</th><th>Volume (kg)</th><th>1RM estimada (kg)</th></tr></thead><tbody>'+items+'</tbody></table></div>':'<div class="insight-empty">Sem séries para este filtro.</div>')+'<p class="muted space">Indicadores históricos e estimativas não substituem avaliação profissional. O volume considera repetições numéricas realizadas.</p></section>';
+ '<section class="card section"><div class="between"><h2>Exercícios com mais volume</h2><span class="tag">'+filtered.length+' exercícios registrados</span></div>'+(items?'<div class="insight-scroll"><table class="insight-table"><thead><tr><th>Exercício</th><th>Séries</th><th>Volume na unidade selecionada</th><th>1RM na unidade selecionada</th></tr></thead><tbody>'+items+'</tbody></table></div>':'<div class="insight-empty">Sem séries para este filtro.</div>')+'<p class="muted space">Indicadores históricos e estimativas não substituem avaliação profissional. O volume considera repetições numéricas realizadas.</p></section>';
 }
 function exportInsights(){
  if(!window.EvoluInsights)return toast('O módulo de indicadores não está disponível.');
- const data=EvoluInsights.aggregate(db,insightStudent),csv=EvoluInsights.exportCSV(data);
+ const data=EvoluInsights.aggregate(db,insightStudent,Date.now(),insightVolumeUnit),csv=EvoluInsights.exportCSV(data);
  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
  const a=document.createElement('a');a.href=url;a.download='EvoluPersonal_Evolucao_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
  setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -1213,10 +1100,10 @@ render();if(loadError)toast('Não foi possível ler a base anterior. Verifique a
  }
  function exportEvolutionPDF(){
   if(!window.EvoluInsights)return toast('O módulo de evolução não está disponível.');
-  const data=EvoluInsights.aggregate(db,insightStudent),label=insightStudent==='all'?'Todos os alunos':student(insightStudent)?.name||'Aluno';
-  const rows=(data.rows||[]).map(r=>'<tr><td>'+safe(new Date(r.date).toLocaleDateString('pt-BR'))+'</td><td>'+safe(student(r.student)?.name||'Aluno')+'</td><td>'+safe(r.title)+'</td><td>'+safe(r.name)+'</td><td>'+safe(r.set)+'</td><td>'+safe(r.load)+'</td><td>'+safe(r.reps??'—')+'</td><td>'+safe(r.volume)+'</td><td>'+safe(r.estimated1RM??'—')+'</td></tr>').join('');
-  const weeks=(data.weeks||[]).map(w=>'<tr><td>'+safe(w.start)+'</td><td>'+w.sessions+'</td><td>'+w.sets+'</td><td>'+safe(w.volume)+' kg</td></tr>').join('');
-  const body='<h1>Evolução de treinos</h1><p class="meta">Aluno: '+safe(label)+' · Emitido em '+new Date().toLocaleDateString('pt-BR')+'</p><div class="card"><strong>'+data.sessions+'</strong> sessões · <strong>'+data.loggedSets+'</strong> séries · <strong>'+safe(data.totalVolume)+' kg</strong> de volume · <strong>'+data.personalRecords+'</strong> novos máximos estimados</div><h2>Resumo semanal</h2><table class="table"><thead><tr><th>Semana</th><th>Sessões</th><th>Séries</th><th>Volume</th></tr></thead><tbody>'+weeks+'</tbody></table><h2>Registros por série</h2><table class="table"><thead><tr><th>Data</th><th>Aluno</th><th>Treino</th><th>Exercício</th><th>Série</th><th>Carga</th><th>Reps/tempo</th><th>Volume</th><th>1RM estimada</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  const data=EvoluInsights.aggregate(db,insightStudent,Date.now(),insightVolumeUnit),label=insightStudent==='all'?'Todos os alunos':student(insightStudent)?.name||'Aluno';
+  const rows=(data.rows||[]).map(r=>'<tr><td>'+safe(new Date(r.date).toLocaleDateString('pt-BR'))+'</td><td>'+safe(student(r.student)?.name||'Aluno')+'</td><td>'+safe(r.title)+'</td><td>'+safe(r.name)+'</td><td>'+safe(r.set)+'</td><td>'+safe(r.load??'—')+' '+safe(r.unit)+'</td><td>'+safe(r.reps??'—')+'</td><td>'+safe(r.volume)+'</td><td>'+safe(r.estimated1RM??'—')+'</td></tr>').join('');
+  const weeks=(data.weeks||[]).map(w=>'<tr><td>'+safe(w.start)+'</td><td>'+w.sessions+'</td><td>'+w.sets+'</td><td>'+safe(w.volume)+' '+safe(data.volumeUnit)+' × rep.</td></tr>').join('');
+  const body='<h1>Evolução de treinos</h1><p class="meta">Aluno: '+safe(label)+' · Emitido em '+new Date().toLocaleDateString('pt-BR')+'</p><div class="card"><strong>'+data.sessions+'</strong> sessões · <strong>'+data.loggedSets+'</strong> séries · <strong>'+safe(data.totalVolume)+' '+safe(data.volumeUnit)+' × rep.</strong> de volume · <strong>'+data.personalRecords+'</strong> novos máximos estimados</div><h2>Resumo semanal</h2><table class="table"><thead><tr><th>Semana</th><th>Sessões</th><th>Séries</th><th>Volume</th></tr></thead><tbody>'+weeks+'</tbody></table><h2>Registros por série</h2><table class="table"><thead><tr><th>Data</th><th>Aluno</th><th>Treino</th><th>Exercício</th><th>Série</th><th>Carga</th><th>Reps/tempo</th><th>Volume</th><th>1RM estimada</th></tr></thead><tbody>'+rows+'</tbody></table>';
   printWindow('EvoluPersonal — Evolução de treinos',body);
  }
  function bind(){}
@@ -1990,7 +1877,7 @@ EvoluPrograms.boot();
   function pwaPanel() {
     const secure = window.isSecureContext, supported = 'serviceWorker' in navigator && secure, standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
     const state = !supported ? 'Use o endereço HTTPS publicado para instalar e habilitar recursos offline.' : standalone ? 'Instalado como aplicativo.' : 'Pronto para instalar pelo navegador.';
-    return '<section class="card section"><div class="eyebrow">ETAPA 10 · INSTALAÇÃO E OFFLINE</div><h2>Aplicativo neste dispositivo</h2><p class="muted" id="epPwaStatus" aria-live="polite">' + state + '</p><div class="row wrap"><button id="epInstallButton" class="primary" onclick="epInstallPWA()" ' + (installPrompt ? '' : 'hidden') + '>Instalar EvoluPersonal</button><button onclick="epCheckPWA()">Verificar instalação</button><button id="epUpdateCheck" onclick="epUpdatePWA()" ' + (supported ? '' : 'disabled') + '>Verificar atualização</button><button id="epUpdateApply" class="primary" onclick="epApplyUpdate()" hidden>Atualizar agora</button></div><p class="muted" id="epUpdateStatus" role="status">Versão instalada · Beta 1.7 RC · Etapa 4</p><p class="muted" id="epStorageStatus">Consultando armazenamento deste navegador…</p><div class="notice">Os dados de alunos permanecem neste dispositivo. Exporte um backup JSON regularmente; instalar o PWA não transfere dados para outro aparelho.</div></section>';
+    return '<section class="card section"><div class="eyebrow">ETAPA 10 · INSTALAÇÃO E OFFLINE</div><h2>Aplicativo neste dispositivo</h2><p class="muted" id="epPwaStatus" aria-live="polite">' + state + '</p><div class="row wrap"><button id="epInstallButton" class="primary" onclick="epInstallPWA()" ' + (installPrompt ? '' : 'hidden') + '>Instalar EvoluPersonal</button><button onclick="epCheckPWA()">Verificar instalação</button><button id="epUpdateCheck" onclick="epUpdatePWA()" ' + (supported ? '' : 'disabled') + '>Verificar atualização</button><button id="epUpdateApply" class="primary" onclick="epApplyUpdate()" hidden>Atualizar agora</button></div><p class="muted" id="epUpdateStatus" role="status">Versão instalada · Beta 1.8 RC · Etapa 5</p><p class="muted" id="epStorageStatus">Consultando armazenamento deste navegador…</p><div class="notice">Os dados de alunos permanecem neste dispositivo. Exporte um backup JSON regularmente; instalar o PWA não transfere dados para outro aparelho.</div></section>';
   }
   window.epInstallPWA = async function () {
     if (!installPrompt) return toast('No celular, abra o menu do navegador e escolha “Instalar aplicativo” ou “Adicionar à tela inicial”.');
@@ -2119,5 +2006,6 @@ EvoluPrograms.boot();
 <script src="./history-tools.js"></script>
 <script src="./routine-tools.js"></script>
 <script src="./import-analysis.js"></script>
+<script src="./remote-tools.js"></script>
 </body></html>
 

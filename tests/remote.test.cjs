@@ -1,0 +1,51 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {createRemoteServer}=require('../remote-server/server.cjs'),remote=require('../remote-tools.js'),routines=require('../routine-tools.js');
+const master='test_'+ 'x'.repeat(40),bundle={format:'evolupersonal-routines',version:1,routines:[{title:'Treino A',notes:'Orientação',items:[{exercise:'md1',sets:1,reps:'10',load:20,rest:60,unit:'kg total'}]}]};
+test('URLs rejeitam credenciais, caminhos e HTTP público',()=>{
+ assert.equal(remote.serverURL('https://example.com/'),'https://example.com');assert.equal(remote.serverURL('http://127.0.0.1:8787'),'http://127.0.0.1:8787');
+ for(const url of ['http://example.com','https://user:pass@example.com','https://example.com/api','javascript:alert(1)','https://example.com/#secret'])assert.equal(remote.serverURL(url),null);
+});
+test('API real: autenticação, convite, isolamento, revisão, fila idempotente e persistência',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ep-remote-')),file=path.join(dir,'state.json');let now=Date.parse('2026-11-05T12:00:00Z');
+ const server=createRemoteServer({token:master,file,origins:['https://app.example'],clock:()=>now});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ t.after(async()=>{await new Promise(resolve=>server.close(resolve));fs.rmSync(dir,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ const req=async(route,method='GET',body,token=master,origin)=>{const r=await fetch(base+route,{method,headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{}),...(origin?{Origin:origin}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,body:await r.json()};};
+ assert.equal((await req('/api/coach/status','GET',null,'wrong')).status,401);
+ assert.equal((await req('/api/coach/status','GET',null,master,'https://evil.example')).status,403);
+ const payload={baseRevision:0,profile:{name:'Aluno teste',email:'não deve ir'},bundle,names:{md1:'Supino'},bindings:['w1']};
+ assert.equal((await req('/api/coach/students/s1','PUT',payload)).body.revision,1);
+ assert.equal((await req('/api/coach/students/s1','PUT',payload)).status,409);
+ assert.equal((await req('/api/coach/students/s2','PUT',{...payload,profile:{name:'Outro aluno'}})).status,200);
+ const invite=(await req('/api/coach/students/s1/invite','POST',{})).body;
+ const student=await req('/api/student','GET',null,invite.token);assert.equal(student.body.student.id,'s1');assert(!JSON.stringify(student.body).includes('não deve ir'));
+ assert.equal((await req('/api/coach/students/s2','GET',null,invite.token)).status,401);
+ const session={id:'log1',revision:1,routine:0,date:new Date(now).toISOString(),records:[{item:0,set:1,load:20,reps:'10'}]};
+ assert.equal((await req('/api/student/sessions','POST',session,invite.token)).status,201);
+ assert.equal((await req('/api/student/sessions','POST',session,invite.token)).body.duplicate,true);
+ assert.equal((await req('/api/student/sessions','POST',{...session,records:[{item:0,set:1,load:20,reps:'11'}]},invite.token)).status,409);
+ assert.equal((await req('/api/student/sessions','POST',{...session,id:'bad',date:'2026-02-30T12:00:00Z'},invite.token)).status,400);
+ assert.equal((await req('/api/student/sessions','POST',{...session,id:'bad',records:[{item:0,set:2,load:20,reps:'10'}]},invite.token)).status,400);
+ assert.equal((await req('/api/student/sessions','POST',{...session,id:'bad',records:[{item:0,set:1,load:20,reps:'8–12'}]},invite.token)).status,400);
+ const stored=await req('/api/coach/students/s1/sessions');assert.equal(stored.body.sessions.length,1);
+ assert.equal((await req('/api/coach/students/s2/sessions')).body.sessions.length,0);
+ const local={students:[{id:'s1'}],exercises:[{id:'md1',name:'Supino'}],sessions:[],workouts:[{id:'w1',student:'s1'}]};let n=0;
+ const merged=remote.mergeSessions(local,stored.body.sessions,'s1','https://example.com',()=>`local${++n}`);assert.equal(merged.added,1);assert.equal(remote.mergeSessions(merged.data,stored.body.sessions,'s1','https://example.com',()=>`local${++n}`).added,0);assert.equal(local.sessions.length,0);
+ assert.equal(merged.data.sessions[0].workout,'w1');
+ const afterDelete=structuredClone(merged.data);afterDelete.sessions=[];assert.equal(remote.mergeSessions(afterDelete,stored.body.sessions,'s1','https://example.com',()=>`local${++n}`).added,0);
+ // Older published prescriptions remain valid for a session queued while offline.
+ assert.equal((await req('/api/coach/students/s1','PUT',{...payload,baseRevision:1})).body.revision,2);
+ assert.equal((await req('/api/student/sessions','POST',{...session,id:'offline1'},invite.token)).status,201);
+ const collision=await Promise.all([req('/api/coach/students/s1','PUT',{...payload,baseRevision:2}),req('/api/coach/students/s1','PUT',{...payload,baseRevision:2})]);assert.deepEqual(collision.map(x=>x.status).sort(),[200,409]);
+ const disk=fs.readFileSync(file,'utf8');assert(!disk.includes(invite.token));assert(!disk.includes(master));assert.equal(JSON.parse(disk).students.s1.sessions.length,2);
+ const renewed=(await req('/api/coach/students/s1/invite','POST',{})).body;assert.equal((await req('/api/student','GET',null,invite.token)).status,401);
+ assert.equal((await req('/api/student','GET',null,renewed.token)).status,200);
+ now+=15*86400000;assert.equal((await req('/api/student','GET',null,renewed.token)).status,401);
+ const last=(await req('/api/coach/students/s1/invite','POST',{})).body;await req('/api/coach/students/s1/invite','DELETE');assert.equal((await req('/api/student','GET',null,last.token)).status,401);
+ const page=await fetch(base+'/student/');assert.equal(page.status,200);assert((await page.text()).includes('EvoluPersonal'));
+ const removal=await req('/api/coach/students/s1','DELETE');assert.equal(removal.body.deleted,true);assert.equal((await req('/api/coach/students/s1')).body.revision,0);assert.equal((await req('/api/coach/students/s2')).body.revision,1);
+});
+test('prescrições avançadas inválidas são rejeitadas antes de importar/publicar',()=>{
+ const base=structuredClone(bundle);base.routines[0].items[0].executionMode='errado';assert.throws(()=>routines.parseBundle(JSON.stringify(base),new Set(['md1'])));
+ base.routines[0].items[0].executionMode='reps';base.routines[0].items[0].setPlan=[{type:'trabalho',mode:'fixed',load:-1,reps:'10',rest:60,percent:100,reference:'base',rir:null}];assert.throws(()=>routines.parseBundle(JSON.stringify(base),new Set(['md1'])));
+});

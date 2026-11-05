@@ -70,7 +70,7 @@
   if(rows.length<2)throw Error('O CSV precisa de cabeçalho e ao menos uma série.');
   if(rows.some(r=>r.length!==rows[0].length))throw Error('Há linhas com número incorreto de colunas.');return rows;
  }
- const aliases={sourceStudent:['aluno','student','student id'],date:['data','date','start time','workout date'],exerciseName:['exercicio','exercise name','exercise title','exercise'],exerciseId:['id do exercicio','exercise id'],title:['treino','workout name','title'],load:['carga kg','weight kg','weight'],reps:['repeticoes','reps','repetitions'],seconds:['duracao s','duration seconds','seconds'],distance:['distancia km','distance km'],mode:['modo','mode'],unit:['unidade','unit','weight unit'],type:['tipo de serie','set type'],session:['id da sessao','session id'],blocks:['blocos adicionais']};
+ const aliases={sourceStudent:['aluno','student','student id'],date:['data','date','start time','workout date'],exerciseName:['exercicio','exercise name','exercise title','exercise'],exerciseId:['id do exercicio','exercise id'],title:['treino','workout name','title'],load:['carga informada','carga','carga kg','weight kg','weight'],reps:['repeticoes','reps','repetitions'],seconds:['duracao s','duration seconds','seconds'],distance:['distancia km','distance km'],mode:['modo','mode'],unit:['unidade','unit','weight unit'],type:['tipo de serie','set type'],session:['id da sessao','session id'],blocks:['blocos adicionais']};
  function number(value,max,integer=false,optional=true){
   const s=String(value??'').trim();if(!s&&optional)return null;
   if(!/^\d+(?:[.,]\d+)?$/.test(s))throw Error('Valor numérico inválido: '+s.slice(0,40));

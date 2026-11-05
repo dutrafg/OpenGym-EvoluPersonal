@@ -130,10 +130,27 @@
       for(const i of items){
         if(!known.has(i.exercise)||!Number.isInteger(i.sets)||i.sets<1||i.sets>20||typeof i.reps!=='string'||!i.reps.trim()||i.reps.length>40||!(i.load===null||bounded(i.load,2000))||!Number.isInteger(i.rest)||!bounded(i.rest,3600))throw Error('Exercício desconhecido ou prescrição inválida.');
         if(i.alternatives!==undefined&&(!Array.isArray(i.alternatives)||i.alternatives.length>5||i.alternatives.some(id=>!known.has(id))))throw Error('Substituto inválido.');
+        validatePrescription(i);
       }
       return {title:w.title.trim(),notes:w.notes,items};
     });
     return {format:data.format,version:1,routines};
+  }
+  function validatePrescription(i){
+    const units=['kg total','kg por halter','kg por lado','placas da máquina','peso corporal'],types=['aquecimento','feeder','trabalho','principal','backoff','drop','restpause'];
+    const work=s=>['trabalho','principal','drop','restpause'].includes(s.type),load=n=>n===null||bounded(n,2000);
+    if(i.unit!==undefined&&!units.includes(i.unit)||i.executionMode!==undefined&&!['reps','timed','cardio'].includes(i.executionMode)||i.sideMode!==undefined&&!['together','separate'].includes(i.sideMode)||i.supersetNext!==undefined&&typeof i.supersetNext!=='boolean')throw Error('Unidade ou modo de execução inválido.');
+    if(i.alternatives&&(new Set(i.alternatives).size!==i.alternatives.length||i.alternatives.includes(i.exercise)))throw Error('Substitutos repetidos ou iguais ao exercício original.');
+    if(i.setPlan!==undefined){
+      if(!i.setPlan.length||i.setPlan.filter(work).length!==i.sets)throw Error('O plano de séries não corresponde ao número de séries de trabalho.');
+      i.setPlan.forEach((s,n)=>{
+        const valid=types.includes(s.type)&&['fixed','percent'].includes(s.mode)&&load(s.load)&&typeof s.reps==='string'&&s.reps.trim()&&s.reps.length<=40&&Number.isInteger(s.rest)&&bounded(s.rest,3600)&&(s.rir===null||Number.isInteger(s.rir)&&bounded(s.rir,10))&&typeof s.percent==='number'&&s.percent>0&&s.percent<=100&&(s.reference==='base'||Number.isInteger(s.reference)&&s.reference>=0&&s.reference<n&&work(i.setPlan[s.reference]))&&(s.type!=='backoff'||s.mode==='percent'&&Number.isInteger(s.reference));
+        if(!valid)throw Error('Prescrição de série inválida.');
+        for(const [key,min,max] of [['drops',1,5],['dropPercent',5,80],['miniSets',1,5],['miniRest',5,120]])if(s[key]!==undefined&&(!Number.isInteger(s[key])||s[key]<min||s[key]>max))throw Error('Parâmetros da técnica avançada inválidos.');
+      });
+    }
+    if(i.progression!==undefined){const p=i.progression;if(!['off','all','principal'].includes(p.criterion)||p.scheme!==undefined&&!['linear','double'].includes(p.scheme)||!Number.isInteger(p.min)||!Number.isInteger(p.max)||p.min<1||p.max<p.min||p.max>100||!bounded(p.increment,100)||p.increment===0||p.deloadAfter!==undefined&&(!Number.isInteger(p.deloadAfter)||p.deloadAfter<2||p.deloadAfter>6)||p.deloadPercent!==undefined&&(!bounded(p.deloadPercent,30)||p.deloadPercent<5))throw Error('Progressão inválida.');}
+    return true;
   }
   function importBundle(data,bundle,sid,uid){
     if(!data.students.some(s=>s.id===sid))throw Error('Aluno de destino inválido.');
@@ -141,5 +158,5 @@
     for(const w of clean.routines){const id=uid();if(typeof id!=='string'||!id||ids.has(id))throw Error('Não foi possível gerar um identificador novo.');ids.add(id);next.workouts.push({...w,id,student:sid});}
     return next;
   }
-  return {sizes,defaultEquipment,validEquipment,validPreferences,orderFavorites,plateLoad,exportBundle,parseBundle,importBundle};
+  return {sizes,defaultEquipment,validEquipment,validPreferences,orderFavorites,plateLoad,exportBundle,parseBundle,importBundle,validatePrescription};
 });

@@ -155,3 +155,70 @@ o fluxo de arquivos em navegador real, o cache offline real e testes com arquivo
 reais de terceiros (os testes atuais usam exemplos controlados). A pendência de
 Android da etapa 3 não foi considerada concluída para iniciar esta implementação.
 A main permanece na Beta 1.5.2; o trabalho das etapas 3/4 está em branches.
+
+
+## Etapa 5 — Beta 1.8 RC e revisão posterior
+
+Referência OpenGym consultada na revisão
+`8fb98b16861a2728652302a7e6e30c50548493a0`:
+`frontend/src/lib/remote.js` e `sync-merge.js`. Implementação própria em
+`remote-tools.js` e `remote-server/`, sem copiar a biblioteca de exercícios.
+
+### Implementado
+
+- Configuração de serviço HTTPS, credencial do personal somente em memória,
+  publicação por aluno e controle de revisão otimista; conflito retorna 409 e
+  não sobrescreve a versão remota automaticamente.
+- Convites individuais aleatórios, hash no servidor, expiração de 14 dias,
+  renovação que invalida o anterior, revogação e exclusão da cópia remota.
+- Página própria do aluno com séries por repetições, tempo ou cardio, registro
+  por lado e blocos de técnicas; preserva a prescrição publicada por revisão.
+- Rascunho local restaurável, fila local de sessões e envio idempotente. Registros
+  de revisão anterior continuam aceitos. A confirmação precisa corresponder ao ID
+  enviado antes de retirar o registro da fila.
+- Recebimento aditivo pelo personal; valida o banco antes de gravar e desfaz a
+  alteração em falha de armazenamento. Recibos impedem reimportação após exclusão
+  local. O vínculo com a rotina local é preservado quando ela ainda existe.
+- API HTTP implementada e testada com persistência em arquivo; cabeçalhos CORS
+  restritos, comparação de credenciais, limites de solicitação e de taxa.
+- Shell separado do aluno, sem cache de respostas da API. Somente a prescrição,
+  rascunho e fila próprios ficam no armazenamento local do navegador.
+
+### Bugs corrigidos na revisão
+
+1. Importação de rotinas aceitava campos avançados inconsistentes até chegar ao
+   validador global. A leitura agora valida plano, contagem de séries, unidade,
+   modo, referências, técnicas e progressão antes de importar ou publicar.
+2. Resumo de evolução somava unidades incompatíveis. O resumo, recordes e gráfico
+   semanal agora usam uma unidade selecionada; CSV e PDF identificam as unidades.
+3. Séries concluídas sem carga conhecida eram omitidas dos indicadores. Elas
+   permanecem no histórico e na contagem, sem inventar volume ou estimativa de 1RM.
+4. A cópia externa `insights.js` estava divergindo do código inline. O módulo passou
+   a ser a fonte única carregada pelo PWA, com teste de regressão para CSV e unidades.
+5. No novo fluxo remoto, foram corrigidos troca de convite com dados antigos,
+   proteção de rascunho, recuperação de dados locais ilegíveis, validação de
+   recibos, vínculo da sessão à rotina e preservação de acesso durante operações.
+
+### Verificação
+
+`npm test`: 17 testes automatizados, incluindo 1.000 estoques de anilhas comparados
+com busca exaustiva. API HTTP real testada para autenticação, origem rejeitada,
+isolamento entre alunos, expiração/revogação, revisão concorrente, replay igual,
+replay divergente, datas inválidas, séries fora do plano e gravação persistente.
+
+`npm run test:dom`: fluxo em DOM simulado do PWA do personal com publicação,
+convite e recebimento pela API HTTP local; regressão de favoritos, equipamentos,
+CSV e rotinas. Fluxo do aluno testado com restauração de rascunho, perda de rede,
+fila persistida, reconexão e envio sem duplicação. Credencial do personal não
+aparece no backup. Os testes usam exclusivamente dados fictícios.
+
+### Pendências preservadas
+
+Não foi provisionado servidor público. Faltam domínio HTTPS, armazenamento
+persistente/backup homologado, teste real dos service workers e validação visual
+em Android. O servidor desta RC exige uma única instância por arquivo e não faz
+criptografia em repouso. Não há sincronização de exclusões/edições ou multi-personal.
+As pendências de dispositivos das etapas 3 e 4 continuam abertas.
+
+A etapa 5 está implementada para homologação local, não declarada concluída em
+produção. A main permanece na Beta 1.5.2; esta entrega fica em branch própria.

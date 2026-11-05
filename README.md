@@ -70,3 +70,18 @@ e km; cabeçalhos PT-BR e aliases Strong/Hevy, sem garantia de todos os formatos
 regionais desses aplicativos. Consulte `DEVELOPMENT.md` para limites.
 
 Verificação: `node --test tests/*.test.cjs`. Validação real em Android pendente.
+
+## Etapa 5 · Beta 1.8 RC e revisão
+
+Acesso remoto opcional em **Ajustes → Acesso remoto**: publicar prescrições,
+criar/revogar convites e receber sessões dos alunos. Inclui o servidor e a página
+separada do aluno, com rascunho e fila local. Consulte
+[remote-server/README.md](remote-server/README.md) para execução e limites.
+O serviço ainda não foi publicado; o PWA estático continua funcionando localmente.
+
+Revisão corrigiu mistura de unidades no volume/recordes, séries sem carga conhecida
+e validação de prescrições avançadas. Evolução agora oferece unidade do resumo;
+CSV inclui unidade e IDs. O módulo `insights.js` é carregado como fonte única.
+
+Testes de lógica/API: `npm test`. Testes de DOM: `npm ci` e `npm run test:dom`.
+Android, HTTPS público e cache real permanecem pendentes. Esta RC não está na main.
