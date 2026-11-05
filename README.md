@@ -59,3 +59,14 @@ são preservados. Revise as orientações livres antes de compartilhar.
 
 Testes: `node --test tests/routine-tools.test.cjs`.
 Validação visual em Android ainda pendente; não é uma etapa encerrada.
+
+## Etapa 4 · Beta 1.7 RC
+
+Primeira entrega em desenvolvimento: **Evolução → Importar histórico CSV** e
+**Séries por grupo muscular**, também disponíveis em Ajustes. A importação pede
+aluno, associações e unidades antes de gravar; apenas acrescenta sessões e ignora
+reimportações idênticas deste importador no mesmo aluno. Datas ISO, kg, segundos
+e km; cabeçalhos PT-BR e aliases Strong/Hevy, sem garantia de todos os formatos
+regionais desses aplicativos. Consulte `DEVELOPMENT.md` para limites.
+
+Verificação: `node --test tests/*.test.cjs`. Validação real em Android pendente.

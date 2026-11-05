@@ -103,7 +103,7 @@
     const best=Math.max(...states.keys()),actual=equipment.bar+best/2,missing=Math.round((target-actual)*1000)/1000;
     return {belowBar:false,plates:states.get(best),actual,missing,exact:missing===0};
   }
-  const itemKeys=['exercise','sets','reps','load','rest','unit','executionMode','sideMode','alternatives','setPlan','progression'];
+  const itemKeys=['exercise','sets','reps','load','rest','unit','executionMode','sideMode','supersetNext','alternatives','setPlan','progression'];
   const seriesKeys=['type','mode','load','reps','rest','percent','reference','rir','drops','dropPercent','miniSets','miniRest'];
   const progressionKeys=['scheme','criterion','min','max','increment','deloadAfter','deloadPercent'];
   const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>Object.hasOwn(value,k)).map(k=>[k,structuredClone(value[k])]));

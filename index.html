@@ -124,7 +124,7 @@
 }
 @media(prefers-reduced-motion:reduce){.rail{scroll-behavior:auto!important}}
 </style></head><body>
-<div class="shell"><nav class="rail" aria-label="Navegação principal"><div class="brand">e</div><div id="nav" style="display:contents"></div><button class="bottom" id="themeRail" aria-label="Alternar tema"></button></nav><main class="main"><header class="top"><div class="row"><div class="wordmark">evolu<span>personal</span></div><span class="tag">BETA 1.6 RC · ETAPA 3 · VERSÃO DE TESTE</span></div><div class="tools"><button id="modeBtn"></button><button id="themeBtn" aria-label="Alternar tema"></button></div></header><div id="app"><section class="notice" id="appBootFallback"><strong>Carregando a prévia do EvoluPersonal…</strong><p style="margin:6px 0 0">Se esta mensagem continuar, o navegador bloqueou ou interrompeu o JavaScript. Abra a versão corrigida em um navegador com JavaScript habilitado.</p></section></div><footer class="foot">EvoluPersonal · Beta 1.6 RC · Etapa 3</footer></main></div>
+<div class="shell"><nav class="rail" aria-label="Navegação principal"><div class="brand">e</div><div id="nav" style="display:contents"></div><button class="bottom" id="themeRail" aria-label="Alternar tema"></button></nav><main class="main"><header class="top"><div class="row"><div class="wordmark">evolu<span>personal</span></div><span class="tag">BETA 1.7 RC · ETAPA 4 · VERSÃO DE TESTE</span></div><div class="tools"><button id="modeBtn"></button><button id="themeBtn" aria-label="Alternar tema"></button></div></header><div id="app"><section class="notice" id="appBootFallback"><strong>Carregando a prévia do EvoluPersonal…</strong><p style="margin:6px 0 0">Se esta mensagem continuar, o navegador bloqueou ou interrompeu o JavaScript. Abra a versão corrigida em um navegador com JavaScript habilitado.</p></section></div><footer class="foot">EvoluPersonal · Beta 1.7 RC · Etapa 4</footer></main></div>
 <dialog id="modal"><div class="between"><h2 id="modalTitle"></h2><button class="quiet" onclick="closeModal()" aria-label="Fechar janela">✕</button></div><div class="modalbody" id="modalBody"></div></dialog><div id="toast" role="status" hidden></div><div id="timer" hidden><small>DESCANSO</small><b id="clock">00:00</b><div class="row"><button onclick="pauseTimer()" id="pauseBtn">Pausar</button><button onclick="stopTimer()">Encerrar</button></div></div>
 <script>
 'use strict';
@@ -432,9 +432,9 @@ function showSession(id){const s=db.sessions.find(s=>s.id===id);if(!s)return;ope
     return '"'+v.replace(/"/g,'""')+'"';
   }
   function exportCSV(data){
-    const headers=['Data','Aluno','Treino','Exercício','Série','Carga (kg)','Repetições','Volume (kg)','1RM estimada (kg)','Modo','Duração (s)','Distância (km)','Blocos adicionais'];
+    const headers=['Data','Aluno','Treino','Exercício','Série','Carga (kg)','Repetições','Volume (kg)','1RM estimada (kg)','Modo','Duração (s)','Distância (km)','Blocos adicionais','ID do exercício','Unidade','Tipo de série','ID da sessão'];
     const rows=(data.rows||[]).map(r=>[
-      r.date,r.student,r.title,r.name,r.set,r.load,r.reps===null?'':r.reps,r.volume,r.estimated1RM===null?'':r.estimated1RM,r.executionMode,r.durationSeconds,r.distanceKm,JSON.stringify(r.blocks)
+      r.date,r.student,r.title,r.name,r.set,r.load,r.reps===null?'':r.reps,r.volume,r.estimated1RM===null?'':r.estimated1RM,r.executionMode,r.durationSeconds,r.distanceKm,JSON.stringify(r.blocks),r.exercise,r.unit,r.type,r.session
     ]);
     return '\uFEFF'+[headers,...rows].map(row=>row.map(csvSafe).join(';')).join('\r\n');
   }
@@ -1990,7 +1990,7 @@ EvoluPrograms.boot();
   function pwaPanel() {
     const secure = window.isSecureContext, supported = 'serviceWorker' in navigator && secure, standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
     const state = !supported ? 'Use o endereço HTTPS publicado para instalar e habilitar recursos offline.' : standalone ? 'Instalado como aplicativo.' : 'Pronto para instalar pelo navegador.';
-    return '<section class="card section"><div class="eyebrow">ETAPA 10 · INSTALAÇÃO E OFFLINE</div><h2>Aplicativo neste dispositivo</h2><p class="muted" id="epPwaStatus" aria-live="polite">' + state + '</p><div class="row wrap"><button id="epInstallButton" class="primary" onclick="epInstallPWA()" ' + (installPrompt ? '' : 'hidden') + '>Instalar EvoluPersonal</button><button onclick="epCheckPWA()">Verificar instalação</button><button id="epUpdateCheck" onclick="epUpdatePWA()" ' + (supported ? '' : 'disabled') + '>Verificar atualização</button><button id="epUpdateApply" class="primary" onclick="epApplyUpdate()" hidden>Atualizar agora</button></div><p class="muted" id="epUpdateStatus" role="status">Versão instalada · Beta 1.6 RC · Etapa 3</p><p class="muted" id="epStorageStatus">Consultando armazenamento deste navegador…</p><div class="notice">Os dados de alunos permanecem neste dispositivo. Exporte um backup JSON regularmente; instalar o PWA não transfere dados para outro aparelho.</div></section>';
+    return '<section class="card section"><div class="eyebrow">ETAPA 10 · INSTALAÇÃO E OFFLINE</div><h2>Aplicativo neste dispositivo</h2><p class="muted" id="epPwaStatus" aria-live="polite">' + state + '</p><div class="row wrap"><button id="epInstallButton" class="primary" onclick="epInstallPWA()" ' + (installPrompt ? '' : 'hidden') + '>Instalar EvoluPersonal</button><button onclick="epCheckPWA()">Verificar instalação</button><button id="epUpdateCheck" onclick="epUpdatePWA()" ' + (supported ? '' : 'disabled') + '>Verificar atualização</button><button id="epUpdateApply" class="primary" onclick="epApplyUpdate()" hidden>Atualizar agora</button></div><p class="muted" id="epUpdateStatus" role="status">Versão instalada · Beta 1.7 RC · Etapa 4</p><p class="muted" id="epStorageStatus">Consultando armazenamento deste navegador…</p><div class="notice">Os dados de alunos permanecem neste dispositivo. Exporte um backup JSON regularmente; instalar o PWA não transfere dados para outro aparelho.</div></section>';
   }
   window.epInstallPWA = async function () {
     if (!installPrompt) return toast('No celular, abra o menu do navegador e escolha “Instalar aplicativo” ou “Adicionar à tela inicial”.');
@@ -2118,5 +2118,6 @@ EvoluPrograms.boot();
 <script src="./execution.js"></script>
 <script src="./history-tools.js"></script>
 <script src="./routine-tools.js"></script>
+<script src="./import-analysis.js"></script>
 </body></html>
 

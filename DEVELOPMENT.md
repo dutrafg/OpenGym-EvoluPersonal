@@ -104,3 +104,54 @@ Pendente: validação visual e fluxo em navegador real, em especial Android, ant
 de declarar a etapa concluída. DOM simulado não comprova layout, download do
 arquivo, instalação PWA ou cache real. A RC fica em branch de desenvolvimento;
 a main permanece na Beta 1.5.2 das 37 mídias aprovadas.
+
+
+## Etapa 4 — Beta 1.7 RC (primeira entrega)
+
+Referência OpenGym consultada antes da implementação:
+`8fb98b16861a2728652302a7e6e30c50548493a0`, arquivos
+`frontend/src/lib/import-csv.js`, `muscles.js` e `muscle-targets.js`.
+Implementação independente em `import-analysis.js`; nenhum catálogo muscular ou
+arquivo de mídia do OpenGym foi incorporado.
+
+### Importador de histórico CSV
+
+- Cabeçalhos PT-BR do EvoluPersonal e aliases Strong/Hevy. Apenas datas ISO,
+  carga em kg/unidades explícitas do EvoluPersonal, duração em segundos e
+  distância em km. Não converte libras nem adivinha datas regionais.
+- Aspas, escape de aspas, campos com quebra de linha, BOM, CRLF e separador
+  vírgula/ponto e vírgula. Rejeita arquivo incompleto ou linhas deslocadas.
+- Limites: 2 MB, 5.000 séries e 100 nomes de exercícios distintos por lote.
+- Prévia, escolha de aluno e associação manual dos exercícios não reconhecidos.
+  Associação automática só por ID MD existente ou nome normalizado exato e único.
+- Preserva unidades declaradas e cargas não informadas (null). Rejeita valores
+  fora de limites, metas de repetições no lugar de execução, tipos desconhecidos
+  e blocos adicionais inválidos. Arquivo inteiro validado antes de gravar.
+- Acrescenta sessões com IDs novos, sem alterar rotinas ou sessões existentes.
+  Assinatura exata por aluno evita reimportação de sessões deste importador;
+  sessões manuais anteriores não são consideradas duplicatas automaticamente.
+- Falha de armazenamento desfaz a alteração. Cancelar não altera o histórico.
+- CSV do EvoluPersonal agora inclui ID do exercício, unidade, tipo e ID da sessão.
+
+### Distribuição muscular
+
+Em Evolução/Ajustes, selecionar aluno e intervalo de datas para consultar séries
+concluídas por grupo cadastrado no catálogo. Separa aquecimento/preparatórias,
+cardio e exercícios sem grupo. Série unilateral conta uma vez; blocos de técnica
+não multiplicam séries. O resultado é por grupos amplos (Peito, Costas, Pernas,
+Ombros, Braços, Core), sem inventar músculos secundários ou pesos de participação.
+Não oferece faixas ideais nem diagnóstico de desequilíbrio.
+
+### Verificação e limites
+
+Treze testes automatizados das etapas 3/4 passaram, incluindo 1.000 estoques de
+anilhas. Teste de DOM adicional: importação CSV pela tela, associação exata,
+reimportação sem duplicação, rollback de gravação, validação do banco completo,
+análise por período e releitura do CSV exportado. Recursos da etapa 3 passaram
+na regressão. Corrigida também a preservação de superséries nos arquivos de rotinas.
+
+A etapa 4 está iniciada, não encerrada. Permanecem a homologação visual em Android,
+o fluxo de arquivos em navegador real, o cache offline real e testes com arquivos
+reais de terceiros (os testes atuais usam exemplos controlados). A pendência de
+Android da etapa 3 não foi considerada concluída para iniciar esta implementação.
+A main permanece na Beta 1.5.2; o trabalho das etapas 3/4 está em branches.
