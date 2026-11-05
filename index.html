@@ -124,7 +124,7 @@
 }
 @media(prefers-reduced-motion:reduce){.rail{scroll-behavior:auto!important}}
 </style></head><body>
-<div class="shell"><nav class="rail" aria-label="Navegação principal"><div class="brand">e</div><div id="nav" style="display:contents"></div><button class="bottom" id="themeRail" aria-label="Alternar tema"></button></nav><main class="main"><header class="top"><div class="row"><div class="wordmark">evolu<span>personal</span></div><span class="tag">BETA 1.4 · VERSÃO DE TESTE</span></div><div class="tools"><button id="modeBtn"></button><button id="themeBtn" aria-label="Alternar tema"></button></div></header><div id="app"><section class="notice" id="appBootFallback"><strong>Carregando a prévia do EvoluPersonal…</strong><p style="margin:6px 0 0">Se esta mensagem continuar, o navegador bloqueou ou interrompeu o JavaScript. Abra a versão corrigida em um navegador com JavaScript habilitado.</p></section></div><footer class="foot">EvoluPersonal · Beta 1.4</footer></main></div>
+<div class="shell"><nav class="rail" aria-label="Navegação principal"><div class="brand">e</div><div id="nav" style="display:contents"></div><button class="bottom" id="themeRail" aria-label="Alternar tema"></button></nav><main class="main"><header class="top"><div class="row"><div class="wordmark">evolu<span>personal</span></div><span class="tag">BETA 1.5 · VERSÃO DE TESTE</span></div><div class="tools"><button id="modeBtn"></button><button id="themeBtn" aria-label="Alternar tema"></button></div></header><div id="app"><section class="notice" id="appBootFallback"><strong>Carregando a prévia do EvoluPersonal…</strong><p style="margin:6px 0 0">Se esta mensagem continuar, o navegador bloqueou ou interrompeu o JavaScript. Abra a versão corrigida em um navegador com JavaScript habilitado.</p></section></div><footer class="foot">EvoluPersonal · Beta 1.5</footer></main></div>
 <dialog id="modal"><div class="between"><h2 id="modalTitle"></h2><button class="quiet" onclick="closeModal()" aria-label="Fechar janela">✕</button></div><div class="modalbody" id="modalBody"></div></dialog><div id="toast" role="status" hidden></div><div id="timer" hidden><small>DESCANSO</small><b id="clock">00:00</b><div class="row"><button onclick="pauseTimer()" id="pauseBtn">Pausar</button><button onclick="stopTimer()">Encerrar</button></div></div>
 <script>
 'use strict';
@@ -153,7 +153,7 @@ function validDB(d){try{
     if(!Array.isArray(i.setPlan)||i.setPlan.length<1||i.setPlan.length>30||i.sets!==i.setPlan.filter(isWork).length||i.sets<1||i.sets>20)return false;
     if(!i.setPlan.every((s,k)=>s&&Object.hasOwn(SERIES_TYPES,s.type)&&['fixed','percent'].includes(s.mode)&&validLoad(s.load)&&typeof s.reps==='string'&&s.reps.trim()&&s.reps.length<=40&&Number.isInteger(s.rest)&&s.rest>=0&&s.rest<=3600&&(s.rir===null||Number.isInteger(s.rir)&&s.rir>=0&&s.rir<=10)&&Number.isFinite(s.percent)&&s.percent>0&&s.percent<=100&&(s.reference==='base'||Number.isInteger(s.reference)&&s.reference>=0&&s.reference<k&&isWork(i.setPlan[s.reference]))&&(s.type!=='backoff'||s.mode==='percent'&&Number.isInteger(s.reference))))return false;
    }
-   if(i.progression!==undefined){const p=i.progression;if(i.executionMode&&i.executionMode!=='reps'||!p||(p.scheme!==undefined&&!['linear','double'].includes(p.scheme))||(p.deloadAfter!==undefined&&(!Number.isInteger(p.deloadAfter)||p.deloadAfter<2||p.deloadAfter>6))||(p.deloadPercent!==undefined&&(!Number.isFinite(p.deloadPercent)||p.deloadPercent<5||p.deloadPercent>30))||!['off','all','principal'].includes(p.criterion)||!Number.isInteger(p.min)||!Number.isInteger(p.max)||p.min<1||p.max<p.min||p.max>100||!Number.isFinite(p.increment)||p.increment<=0||p.increment>100)return false;}
+   if(i.progression!==undefined){const p=i.progression;if(!p||(p.scheme!==undefined&&!['linear','double'].includes(p.scheme))||(p.deloadAfter!==undefined&&(!Number.isInteger(p.deloadAfter)||p.deloadAfter<2||p.deloadAfter>6))||(p.deloadPercent!==undefined&&(!Number.isFinite(p.deloadPercent)||p.deloadPercent<5||p.deloadPercent>30))||!['off','all','principal'].includes(p.criterion)||!Number.isInteger(p.min)||!Number.isInteger(p.max)||p.min<1||p.max<p.min||p.max>100||!Number.isFinite(p.increment)||p.increment<=0||p.increment>100)return false;}
    const pi=projected.workouts[wi].items[n];pi.sets=planFor(i).length;pi.load=i.load===null?0:i.load;
   }
  }
@@ -365,7 +365,7 @@ function showSession(id){const s=db.sessions.find(s=>s.id===id);if(!s)return;ope
       const strength = mode === 'reps';
       if (['aquecimento', 'feeder'].includes(record.type)) continue;
       const sideReps = Number(record.left) > 0 && Number(record.right) > 0 ? Number(record.left) + Number(record.right) : null;
-      const reps = strength ? sideReps ?? actualReps(record.reps) : null, load=number(record.load);
+      const reps = strength ? sideReps ?? actualReps(record.reps) : null, load=strength?number(record.load):(number(record.load)??0);
       if(load===null||load<0||load>2000)continue;
       const blockVolume = strength ? (record.blocks || []).reduce((total, b) => total + (number(b?.load) || 0) * (actualReps(b?.reps) || 0), 0) : 0;
       const volume = reps === null ? 0 : Math.round((load * reps + blockVolume) * 100) / 100;
@@ -376,7 +376,7 @@ function showSession(id){const s=db.sessions.find(s=>s.id===id);if(!s)return;ope
         volume,estimated1RM:strength && !['drop','restpause'].includes(record.type) && sideReps === null ? estimated1RM(load,reps) : null,
         executionMode:mode,durationSeconds:number(record.durationSeconds),distanceKm:number(record.distanceKm),
         blocks:record.blocks || [],
-        type:String(record.type||'trabalho')
+        unit:String(record.unit||'kg total'),type:String(record.type||'trabalho')
       });
     }
     return {sessions,rows};
@@ -969,7 +969,7 @@ function toggleStudentSet(id,i,checked){
  if(bar)bar.style.width=Math.round(done/(total||1)*100)+'%';if(label)label.textContent=done+' de '+total+' séries concluídas';if(finish)finish.disabled=done!==total;
  if(r.done&&r.rest>0)startTimer(r.rest);
 }
-function lastWorkoutLoad(sid,wid,eid){for(const session of db.sessions.slice().reverse()){if(session.student!==sid||session.workout!==wid)continue;const done=session.records.filter(r=>r.done&&r.exercise===eid);if(done.length)return Math.max(...done.map(r=>Number(r.load)||0))}return null}
+function lastWorkoutLoad(sid,wid,eid){for(const session of db.sessions.slice().sort((a,b)=>Date.parse(b.date)-Date.parse(a.date))){if(session.student!==sid||session.workout!==wid)continue;const done=session.records.filter(r=>r.done&&r.exercise===eid);if(done.length)return Math.max(...done.map(r=>Number(r.load)||0))}return null}
 function studentExecutionView(w){
  const d=db.drafts[w.id];if(!d)return '';let n=0;const done=d.records.filter(r=>r.done).length,total=d.records.length;
  const cards=w.items.map((item,itemIndex)=>{const ex=exercise(d.substitutions?.[itemIndex]||item.exercise),rows=d.records.filter(r=>r.item===itemIndex).map(r=>{const i=n++;return '<div class="ep-set-row"><span>'+r.set+'</span><input type="number" min="0" max="2000" step="0.5" inputmode="decimal" aria-label="Carga da série '+r.set+' em kg" onchange="updateStudentRecord(\''+esc(w.id)+'\','+i+',\'load\',this.value)" value="'+esc(r.load)+'"><input type="text" inputmode="numeric" aria-label="Repetições feitas na série '+r.set+'" onchange="updateStudentRecord(\''+esc(w.id)+'\','+i+',\'reps\',this.value)" value="'+esc(r.reps)+'"><input type="checkbox" aria-label="Marcar série '+r.set+' concluída" onchange="toggleStudentSet(\''+esc(w.id)+'\','+i+',this.checked)" '+(r.done?'checked':'')+'></div>'}).join('');
@@ -1007,7 +1007,7 @@ function insightsView(){
  return heading('ACOMPANHAMENTO','Evolução de treinos','Indicadores locais do aluno por sessão e grupo muscular.','<button class="primary" onclick="exportInsights()">Exportar CSV</button>')+'<div class="card"><label style="max-width:360px">Filtrar aluno<select aria-label="Selecionar aluno da evolução" onchange="insightStudent=this.value;insightExercise=\'\';insightMuscle=\'all\';render()">'+choices+'</select></label><p class="muted" style="margin:10px 0 0">A linha mostra a maior carga registrada em uma série por sessão. A estimativa de 1RM usa séries concluídas de 1 a 12 repetições.</p></div>'+
  '<div class="insight-kpis"><div class="insight-kpi"><span class="muted">Sessões concluídas</span><strong>'+fmt(data.sessions)+'</strong><small>Com registro histórico</small></div><div class="insight-kpi"><span class="muted">Séries registradas</span><strong>'+fmt(data.loggedSets)+'</strong><small>Séries concluídas</small></div><div class="insight-kpi"><span class="muted">Volume registrado</span><strong>'+fmt(data.totalVolume)+' kg</strong><small>Carga × repetições válidas</small></div><div class="insight-kpi"><span class="muted">Novos máximos estimados</span><strong>'+fmt(data.personalRecords)+'</strong><small>Progressões por exercício</small></div></div>'+
  '<div class="cols"><section class="card"><h2>Volume nas últimas 8 semanas</h2>'+(data.sessions?'<div class="insight-chart" role="img" aria-label="Volume semanal de treino">'+bars+'</div>':'<div class="insight-empty">Conclua uma sessão para visualizar o volume.</div>')+'</section><section class="card"><h2>Sessões recentes</h2>'+(sessions||'<div class="insight-empty">Nenhuma sessão concluída.</div>')+'</section></div>'+
- '<section class="card section"><div class="between"><div><h2>Progressão de carga</h2><p class="muted">Maior peso de uma série em cada sessão.</p></div><label style="max-width:330px">Exercício<select onchange="insightExercise=this.value;render()">'+(options||'<option>Sem exercícios registrados</option>')+'</select></label></div>'+insightLoadSVG(rows)+'</section>'+
+ (window.epHistoryChart?epHistoryChart(data):'<section class="card section"><div class="between"><div><h2>Progressão de carga</h2><p class="muted">Maior peso de uma série em cada sessão.</p></div><label style="max-width:330px">Exercício<select onchange="insightExercise=this.value;render()">'+(options||'<option>Sem exercícios registrados</option>')+'</select></label></div>'+insightLoadSVG(rows)+'</section>')+
  '<section class="card section"><div class="between"><div><h2>Mapa muscular</h2><p class="muted">Séries concluídas por grupo principal do exercício.</p></div><span class="tag">Toque em uma região</span></div>'+insightMap(data.rows)+'</section>'+
  '<section class="card section"><div class="between"><h2>Exercícios com mais volume</h2><span class="tag">'+filtered.length+' exercícios registrados</span></div>'+(items?'<div class="insight-scroll"><table class="insight-table"><thead><tr><th>Exercício</th><th>Séries</th><th>Volume (kg)</th><th>1RM estimada (kg)</th></tr></thead><tbody>'+items+'</tbody></table></div>':'<div class="insight-empty">Sem séries para este filtro.</div>')+'<p class="muted space">Indicadores históricos e estimativas não substituem avaliação profissional. O volume considera repetições numéricas realizadas.</p></section>';
 }
@@ -1985,7 +1985,7 @@ EvoluPrograms.boot();
   function pwaPanel() {
     const secure = window.isSecureContext, supported = 'serviceWorker' in navigator && secure, standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
     const state = !supported ? 'Use o endereço HTTPS publicado para instalar e habilitar recursos offline.' : standalone ? 'Instalado como aplicativo.' : 'Pronto para instalar pelo navegador.';
-    return '<section class="card section"><div class="eyebrow">ETAPA 10 · INSTALAÇÃO E OFFLINE</div><h2>Aplicativo neste dispositivo</h2><p class="muted" id="epPwaStatus" aria-live="polite">' + state + '</p><div class="row wrap"><button id="epInstallButton" class="primary" onclick="epInstallPWA()" ' + (installPrompt ? '' : 'hidden') + '>Instalar EvoluPersonal</button><button onclick="epCheckPWA()">Verificar instalação</button><button id="epUpdateCheck" onclick="epUpdatePWA()" ' + (supported ? '' : 'disabled') + '>Verificar atualização</button><button id="epUpdateApply" class="primary" onclick="epApplyUpdate()" hidden>Atualizar agora</button></div><p class="muted" id="epUpdateStatus" role="status">Versão instalada · Beta 1.4</p><p class="muted" id="epStorageStatus">Consultando armazenamento deste navegador…</p><div class="notice">Os dados de alunos permanecem neste dispositivo. Exporte um backup JSON regularmente; instalar o PWA não transfere dados para outro aparelho.</div></section>';
+    return '<section class="card section"><div class="eyebrow">ETAPA 10 · INSTALAÇÃO E OFFLINE</div><h2>Aplicativo neste dispositivo</h2><p class="muted" id="epPwaStatus" aria-live="polite">' + state + '</p><div class="row wrap"><button id="epInstallButton" class="primary" onclick="epInstallPWA()" ' + (installPrompt ? '' : 'hidden') + '>Instalar EvoluPersonal</button><button onclick="epCheckPWA()">Verificar instalação</button><button id="epUpdateCheck" onclick="epUpdatePWA()" ' + (supported ? '' : 'disabled') + '>Verificar atualização</button><button id="epUpdateApply" class="primary" onclick="epApplyUpdate()" hidden>Atualizar agora</button></div><p class="muted" id="epUpdateStatus" role="status">Versão instalada · Beta 1.5</p><p class="muted" id="epStorageStatus">Consultando armazenamento deste navegador…</p><div class="notice">Os dados de alunos permanecem neste dispositivo. Exporte um backup JSON regularmente; instalar o PWA não transfere dados para outro aparelho.</div></section>';
   }
   window.epInstallPWA = async function () {
     if (!installPrompt) return toast('No celular, abra o menu do navegador e escolha “Instalar aplicativo” ou “Adicionar à tela inicial”.');
@@ -2111,5 +2111,6 @@ EvoluPrograms.boot();
 
 </script>
 <script src="./execution.js"></script>
+<script src="./history-tools.js"></script>
 </body></html>
 

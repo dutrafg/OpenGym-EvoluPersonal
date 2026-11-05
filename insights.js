@@ -35,7 +35,7 @@
       const strength = mode === 'reps';
       if (['aquecimento', 'feeder'].includes(record.type)) continue;
       const sideReps = Number(record.left) > 0 && Number(record.right) > 0 ? Number(record.left) + Number(record.right) : null;
-      const reps = strength ? sideReps ?? actualReps(record.reps) : null, load=number(record.load);
+      const reps = strength ? sideReps ?? actualReps(record.reps) : null, load=strength?number(record.load):(number(record.load)??0);
       if(load===null||load<0||load>2000)continue;
       const blockVolume = strength ? (record.blocks || []).reduce((total, b) => total + (number(b?.load) || 0) * (actualReps(b?.reps) || 0), 0) : 0;
       const volume = reps === null ? 0 : Math.round((load * reps + blockVolume) * 100) / 100;
@@ -46,7 +46,7 @@
         volume,estimated1RM:strength && !['drop','restpause'].includes(record.type) && sideReps === null ? estimated1RM(load,reps) : null,
         executionMode:mode,durationSeconds:number(record.durationSeconds),distanceKm:number(record.distanceKm),
         blocks:record.blocks || [],
-        type:String(record.type||'trabalho')
+        unit:String(record.unit||'kg total'),type:String(record.type||'trabalho')
       });
     }
     return {sessions,rows};
