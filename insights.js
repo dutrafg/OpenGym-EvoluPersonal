@@ -21,7 +21,7 @@
   function normalizeSession(s){
     const stamp=Date.parse(s?.date);
     if(!s||!Number.isFinite(stamp)||!Array.isArray(s.records))return null;
-    return {id:String(s.id||''),student:String(s.student||''),title:String(s.title||'Treino'),date:s.date,timestamp:stamp,records:s.records};
+    return {id:String(s.id||''),student:String(s.student||''),title:String(s.title||'Treino'),workout:s.workout,date:s.date,timestamp:stamp,records:s.records};
   }
   function completedRows(db,studentId){
     const sessions=(Array.isArray(db?.sessions)?db.sessions:[]).map(normalizeSession).filter(Boolean)
@@ -30,14 +30,22 @@
     const rows=[];
     for(const session of sessions)for(const record of session.records){
       if(!record||record.done!==true)continue;
-      const reps=actualReps(record.reps),load=number(record.load);
+      const item = db.workouts?.find(w => w.id === session.workout)?.items?.[record.item];
+      const mode = record.executionMode || item?.executionMode || 'reps';
+      const strength = mode === 'reps';
+      if (['aquecimento', 'feeder'].includes(record.type)) continue;
+      const sideReps = Number(record.left) > 0 && Number(record.right) > 0 ? Number(record.left) + Number(record.right) : null;
+      const reps = strength ? sideReps ?? actualReps(record.reps) : null, load=number(record.load);
       if(load===null||load<0||load>2000)continue;
-      const volume=reps===null?0:Math.round(load*reps*100)/100;
+      const blockVolume = strength ? (record.blocks || []).reduce((total, b) => total + (number(b?.load) || 0) * (actualReps(b?.reps) || 0), 0) : 0;
+      const volume = reps === null ? 0 : Math.round((load * reps + blockVolume) * 100) / 100;
       rows.push({
         session:session.id,student:session.student,title:session.title,date:session.date,
         timestamp:session.timestamp,exercise:String(record.exercise||''),
         name:String(record.name||'Exercício'),set:record.set,load,reps,
-        volume,estimated1RM:estimated1RM(load,reps),
+        volume,estimated1RM:strength && !['drop','restpause'].includes(record.type) && sideReps === null ? estimated1RM(load,reps) : null,
+        executionMode:mode,durationSeconds:number(record.durationSeconds),distanceKm:number(record.distanceKm),
+        blocks:record.blocks || [],
         type:String(record.type||'trabalho')
       });
     }
@@ -94,9 +102,9 @@
     return '"'+v.replace(/"/g,'""')+'"';
   }
   function exportCSV(data){
-    const headers=['Data','Aluno','Treino','Exercício','Série','Carga (kg)','Repetições','Volume (kg)','1RM estimada (kg)'];
+    const headers=['Data','Aluno','Treino','Exercício','Série','Carga (kg)','Repetições','Volume (kg)','1RM estimada (kg)','Modo','Duração (s)','Distância (km)','Blocos adicionais'];
     const rows=(data.rows||[]).map(r=>[
-      r.date,r.student,r.title,r.name,r.set,r.load,r.reps===null?'':r.reps,r.volume,r.estimated1RM===null?'':r.estimated1RM
+      r.date,r.student,r.title,r.name,r.set,r.load,r.reps===null?'':r.reps,r.volume,r.estimated1RM===null?'':r.estimated1RM,r.executionMode,r.durationSeconds,r.distanceKm,JSON.stringify(r.blocks)
     ]);
     return '\uFEFF'+[headers,...rows].map(row=>row.map(csvSafe).join(';')).join('\r\n');
   }

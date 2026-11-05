@@ -124,7 +124,7 @@
 }
 @media(prefers-reduced-motion:reduce){.rail{scroll-behavior:auto!important}}
 </style></head><body>
-<div class="shell"><nav class="rail" aria-label="Navegação principal"><div class="brand">e</div><div id="nav" style="display:contents"></div><button class="bottom" id="themeRail" aria-label="Alternar tema"></button></nav><main class="main"><header class="top"><div class="row"><div class="wordmark">evolu<span>personal</span></div><span class="tag">BETA 1.3 · VERSÃO DE TESTE</span></div><div class="tools"><button id="modeBtn"></button><button id="themeBtn" aria-label="Alternar tema"></button></div></header><div id="app"><section class="notice" id="appBootFallback"><strong>Carregando a prévia do EvoluPersonal…</strong><p style="margin:6px 0 0">Se esta mensagem continuar, o navegador bloqueou ou interrompeu o JavaScript. Abra a versão corrigida em um navegador com JavaScript habilitado.</p></section></div><footer class="foot">EvoluPersonal · Beta 1.3</footer></main></div>
+<div class="shell"><nav class="rail" aria-label="Navegação principal"><div class="brand">e</div><div id="nav" style="display:contents"></div><button class="bottom" id="themeRail" aria-label="Alternar tema"></button></nav><main class="main"><header class="top"><div class="row"><div class="wordmark">evolu<span>personal</span></div><span class="tag">BETA 1.4 · VERSÃO DE TESTE</span></div><div class="tools"><button id="modeBtn"></button><button id="themeBtn" aria-label="Alternar tema"></button></div></header><div id="app"><section class="notice" id="appBootFallback"><strong>Carregando a prévia do EvoluPersonal…</strong><p style="margin:6px 0 0">Se esta mensagem continuar, o navegador bloqueou ou interrompeu o JavaScript. Abra a versão corrigida em um navegador com JavaScript habilitado.</p></section></div><footer class="foot">EvoluPersonal · Beta 1.4</footer></main></div>
 <dialog id="modal"><div class="between"><h2 id="modalTitle"></h2><button class="quiet" onclick="closeModal()" aria-label="Fechar janela">✕</button></div><div class="modalbody" id="modalBody"></div></dialog><div id="toast" role="status" hidden></div><div id="timer" hidden><small>DESCANSO</small><b id="clock">00:00</b><div class="row"><button onclick="pauseTimer()" id="pauseBtn">Pausar</button><button onclick="stopTimer()">Encerrar</button></div></div>
 <script>
 'use strict';
@@ -153,7 +153,7 @@ function validDB(d){try{
     if(!Array.isArray(i.setPlan)||i.setPlan.length<1||i.setPlan.length>30||i.sets!==i.setPlan.filter(isWork).length||i.sets<1||i.sets>20)return false;
     if(!i.setPlan.every((s,k)=>s&&Object.hasOwn(SERIES_TYPES,s.type)&&['fixed','percent'].includes(s.mode)&&validLoad(s.load)&&typeof s.reps==='string'&&s.reps.trim()&&s.reps.length<=40&&Number.isInteger(s.rest)&&s.rest>=0&&s.rest<=3600&&(s.rir===null||Number.isInteger(s.rir)&&s.rir>=0&&s.rir<=10)&&Number.isFinite(s.percent)&&s.percent>0&&s.percent<=100&&(s.reference==='base'||Number.isInteger(s.reference)&&s.reference>=0&&s.reference<k&&isWork(i.setPlan[s.reference]))&&(s.type!=='backoff'||s.mode==='percent'&&Number.isInteger(s.reference))))return false;
    }
-   if(i.progression!==undefined){const p=i.progression;if(!p||(p.scheme!==undefined&&!['linear','double'].includes(p.scheme))||(p.deloadAfter!==undefined&&(!Number.isInteger(p.deloadAfter)||p.deloadAfter<2||p.deloadAfter>6))||(p.deloadPercent!==undefined&&(!Number.isFinite(p.deloadPercent)||p.deloadPercent<5||p.deloadPercent>30))||!['off','all','principal'].includes(p.criterion)||!Number.isInteger(p.min)||!Number.isInteger(p.max)||p.min<1||p.max<p.min||p.max>100||!Number.isFinite(p.increment)||p.increment<=0||p.increment>100)return false;}
+   if(i.progression!==undefined){const p=i.progression;if(i.executionMode&&i.executionMode!=='reps'||!p||(p.scheme!==undefined&&!['linear','double'].includes(p.scheme))||(p.deloadAfter!==undefined&&(!Number.isInteger(p.deloadAfter)||p.deloadAfter<2||p.deloadAfter>6))||(p.deloadPercent!==undefined&&(!Number.isFinite(p.deloadPercent)||p.deloadPercent<5||p.deloadPercent>30))||!['off','all','principal'].includes(p.criterion)||!Number.isInteger(p.min)||!Number.isInteger(p.max)||p.min<1||p.max<p.min||p.max>100||!Number.isFinite(p.increment)||p.increment<=0||p.increment>100)return false;}
    const pi=projected.workouts[wi].items[n];pi.sets=planFor(i).length;pi.load=i.load===null?0:i.load;
   }
  }
@@ -252,7 +252,7 @@ function applyPreviousLoad(workoutId,rowIndex,load){
 }
 function estimated1RMForRecord(record){
  const load=record&&record.load,reps=record&&record.reps;
- if(!record||record.done!==true||!Number.isFinite(load)||load<=0||typeof reps!=='string'||!/^\s*\d{1,2}\s*$/.test(reps))return null;
+ if(!record||record.executionMode&&record.executionMode!=='reps'||['aquecimento','feeder','drop','restpause'].includes(record.type)||record.done!==true||!Number.isFinite(load)||load<=0||typeof reps!=='string'||!/^\s*\d{1,2}\s*$/.test(reps))return null;
  const count=Number(reps.trim());if(count<1||count>12)return null;
  return Math.round(load*(1+count/30)*10)/10;
 }
@@ -283,12 +283,13 @@ function recordChange(id,k,field,el){const w=db.workouts.find(w=>w.id===id),d=db
  save();render();
 }
 function progressionSuggestions(w,records){return w.items.flatMap((i,n)=>{
- const p=i.progression;if(!p||p.criterion==='off')return[];const rows=records.filter(r=>r.item===n&&isWork({type:r.type||'trabalho'})&&(p.criterion!=='principal'||r.type==='principal'));
+ const p=i.progression;if(i.executionMode&&i.executionMode!=='reps'||!p||p.criterion==='off')return[];const rows=records.filter(r=>r.item===n&&isWork({type:r.type||'trabalho'})&&(p.criterion!=='principal'||r.type==='principal'));
  if(!rows.length||rows.some(r=>r.exercise!==i.exercise))return[];const eligible=rows.every(r=>r.done&&/^\d+$/.test(r.reps)&&Number(r.reps)>=p.max&&r.load!==null&&(!Number.isFinite(r.targetRir)||r.rir!==null&&r.rir!==undefined&&r.rir>=r.targetRir));
  if(!eligible)return[];return[exercise(i.exercise)?.name+': revisar aumento de '+p.increment+' '+(i.unit||'kg total')+'; critério '+(p.criterion==='all'?'todas as séries':'série principal')+' atingido.'];
  });}
 
 function doubleProgressionStatus(item,rows){
+ if(item.executionMode&&item.executionMode!=='reps')return null;
  const p=item.progression;
  if(!p||p.scheme!=='double'||p.criterion==='off')return null;
  const selected=rows.filter(r=>isWork({type:r.type||'trabalho'})&&(p.criterion!=='principal'||r.type==='principal'));
@@ -350,7 +351,7 @@ function showSession(id){const s=db.sessions.find(s=>s.id===id);if(!s)return;ope
   function normalizeSession(s){
     const stamp=Date.parse(s?.date);
     if(!s||!Number.isFinite(stamp)||!Array.isArray(s.records))return null;
-    return {id:String(s.id||''),student:String(s.student||''),title:String(s.title||'Treino'),date:s.date,timestamp:stamp,records:s.records};
+    return {id:String(s.id||''),student:String(s.student||''),title:String(s.title||'Treino'),workout:s.workout,date:s.date,timestamp:stamp,records:s.records};
   }
   function completedRows(db,studentId){
     const sessions=(Array.isArray(db?.sessions)?db.sessions:[]).map(normalizeSession).filter(Boolean)
@@ -359,14 +360,22 @@ function showSession(id){const s=db.sessions.find(s=>s.id===id);if(!s)return;ope
     const rows=[];
     for(const session of sessions)for(const record of session.records){
       if(!record||record.done!==true)continue;
-      const reps=actualReps(record.reps),load=number(record.load);
+      const item = db.workouts?.find(w => w.id === session.workout)?.items?.[record.item];
+      const mode = record.executionMode || item?.executionMode || 'reps';
+      const strength = mode === 'reps';
+      if (['aquecimento', 'feeder'].includes(record.type)) continue;
+      const sideReps = Number(record.left) > 0 && Number(record.right) > 0 ? Number(record.left) + Number(record.right) : null;
+      const reps = strength ? sideReps ?? actualReps(record.reps) : null, load=number(record.load);
       if(load===null||load<0||load>2000)continue;
-      const volume=reps===null?0:Math.round(load*reps*100)/100;
+      const blockVolume = strength ? (record.blocks || []).reduce((total, b) => total + (number(b?.load) || 0) * (actualReps(b?.reps) || 0), 0) : 0;
+      const volume = reps === null ? 0 : Math.round((load * reps + blockVolume) * 100) / 100;
       rows.push({
         session:session.id,student:session.student,title:session.title,date:session.date,
         timestamp:session.timestamp,exercise:String(record.exercise||''),
         name:String(record.name||'Exercício'),set:record.set,load,reps,
-        volume,estimated1RM:estimated1RM(load,reps),
+        volume,estimated1RM:strength && !['drop','restpause'].includes(record.type) && sideReps === null ? estimated1RM(load,reps) : null,
+        executionMode:mode,durationSeconds:number(record.durationSeconds),distanceKm:number(record.distanceKm),
+        blocks:record.blocks || [],
         type:String(record.type||'trabalho')
       });
     }
@@ -423,9 +432,9 @@ function showSession(id){const s=db.sessions.find(s=>s.id===id);if(!s)return;ope
     return '"'+v.replace(/"/g,'""')+'"';
   }
   function exportCSV(data){
-    const headers=['Data','Aluno','Treino','Exercício','Série','Carga (kg)','Repetições','Volume (kg)','1RM estimada (kg)'];
+    const headers=['Data','Aluno','Treino','Exercício','Série','Carga (kg)','Repetições','Volume (kg)','1RM estimada (kg)','Modo','Duração (s)','Distância (km)','Blocos adicionais'];
     const rows=(data.rows||[]).map(r=>[
-      r.date,r.student,r.title,r.name,r.set,r.load,r.reps===null?'':r.reps,r.volume,r.estimated1RM===null?'':r.estimated1RM
+      r.date,r.student,r.title,r.name,r.set,r.load,r.reps===null?'':r.reps,r.volume,r.estimated1RM===null?'':r.estimated1RM,r.executionMode,r.durationSeconds,r.distanceKm,JSON.stringify(r.blocks)
     ]);
     return '\uFEFF'+[headers,...rows].map(row=>row.map(csvSafe).join(';')).join('\r\n');
   }
@@ -982,7 +991,7 @@ function studentView(){
  const assigned=!program&&own(selected).length?'<section class="card section"><h2>Treinos atribuídos</h2>'+own(selected).map(w=>'<div class="listrow"><div><strong>'+esc(w.title)+'</strong><p>'+w.items.length+' exercícios · '+counts(w.items).work+' séries</p></div><button class="primary" onclick="startStudentWorkout(\''+esc(w.id)+'\')">Iniciar</button></div>').join('')+'</section>':'';
  return heading('ÁREA DO ALUNO','Seu próximo passo.','Treino, execução e evolução reunidos no perfil de '+esc(s.name)+'.')+'<div class="notice"><strong>Prévia local do aluno.</strong> O seletor de perfil serve para testar o fluxo; login e sincronização ainda não estão disponíveis.</div><label style="max-width:360px">Visualizar como<select id="studentSelect">'+db.students.map(x=>'<option value="'+esc(x.id)+'" '+(x.id===selected?'selected':'')+'>'+esc(x.name)+'</option>').join('')+'</select></label><div class="section"><div class="between"><div><h2>Olá, '+esc(s.name.split(' ')[0])+'. Vamos treinar?</h2><p class="muted">Seu objetivo: '+esc(s.goal)+'</p></div>'+(!program?choices:'')+'</div>'+card+routine+assigned+'<section class="card section"><h2>Suas sessões concluídas</h2>'+sessionList(db.sessions.filter(x=>x.student===selected).slice().reverse())+'</section></div>';
 }
-function finishModal(id){const w=db.workouts.find(w=>w.id===id),d=db.drafts[id];if(d.records.some(r=>!r.done))return toast('Marque todas as séries realizadas antes de concluir.');openModal('Como foi o treino?','<form id="finishForm"><label>Percepção de esforço<select name="effort"><option>Leve</option><option selected>Moderado</option><option>Intenso</option><option>Muito intenso</option></select></label><label class="space">Feedback para o personal<textarea name="feedback" maxlength="1500" placeholder="Como você se sentiu? Alguma dificuldade?"></textarea></label><div class="modalfoot"><button type="button" onclick="closeModal()">Voltar</button><button class="primary">Salvar sessão</button></div></form>');document.getElementById('finishForm').onsubmit=e=>{e.preventDefault();let v=Object.fromEntries(new FormData(e.target));const suggestions=[...progressionSuggestions(w,d.records),...advancedProgressionSuggestions(w,d.records,db.sessions)];db.sessions.push({id:uid(),student:w.student,workout:w.id,title:w.title,date:new Date().toISOString(),records:structuredClone(d.records),suggestions,...v});advanceRotationAfterSession(w);delete db.drafts[id];save();stopTimer();closeModal();activeStudentWorkout='';render();if(suggestions.length)openModal('Sugestões para o personal','<p>Revise antes de ajustar o treino.</p>'+suggestions.map(x=>'<p>'+esc(x)+'</p>').join(''));else toast('Sessão concluída! Seu histórico foi atualizado.')}}
+function finishModal(id){const w=db.workouts.find(w=>w.id===id),d=db.drafts[id];if(d.records.some(r=>!r.done))return toast('Marque todas as séries realizadas antes de concluir.');openModal('Como foi o treino?','<form id="finishForm"><label>Percepção de esforço<select name="effort"><option>Leve</option><option selected>Moderado</option><option>Intenso</option><option>Muito intenso</option></select></label><label class="space">Feedback para o personal<textarea name="feedback" maxlength="1500" placeholder="Como você se sentiu? Alguma dificuldade?"></textarea></label><div class="modalfoot"><button type="button" onclick="closeModal()">Voltar</button><button class="primary">Salvar sessão</button></div></form>');document.getElementById('finishForm').onsubmit=e=>{e.preventDefault();const before=structuredClone(db);let v=Object.fromEntries(new FormData(e.target));const suggestions=[...progressionSuggestions(w,d.records),...advancedProgressionSuggestions(w,d.records,db.sessions)];db.sessions.push({id:uid(),student:w.student,workout:w.id,title:w.title,date:new Date().toISOString(),records:structuredClone(d.records),suggestions,...v});advanceRotationAfterSession(w);delete db.drafts[id];if(!save()){db=before;return toast('Não foi possível salvar a sessão. O treino permanece disponível para tentar novamente.');}stopTimer();closeModal();activeStudentWorkout='';render();if(suggestions.length)openModal('Sugestões para o personal','<p>Revise antes de ajustar o treino.</p>'+suggestions.map(x=>'<p>'+esc(x)+'</p>').join(''));else toast('Sessão concluída! Seu histórico foi atualizado.')}}
 
 function insightGroup(row){const ex=exercise(row.exercise),g=String(ex?.group||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(/peito|peitoral/.test(g))return'Peito';if(/costas|dorsal|trapezio/.test(g))return'Costas';if(/ombro|deltoide/.test(g))return'Ombros';if(/braco|biceps|triceps|antebraco/.test(g))return'Braços';if(/perna|quadriceps|gluteo|posterior|panturrilha|adutor|abdutor/.test(g))return'Pernas';if(/core|abdomen|abdominal|lombar/.test(g))return'Core';if(/cardio/.test(g))return'Cardio';return'Outros'}
 function insightCounts(rows){const c={Peito:0,Costas:0,Ombros:0,'Braços':0,Core:0,Pernas:0,Cardio:0,Outros:0};rows.forEach(r=>c[insightGroup(r)]++);return c}
@@ -1248,7 +1257,7 @@ EvoluPrograms.boot();
  window.startTimer=function(seconds){if(!window.__epSuppressRestTimer)originalStartTimer(seconds)};
  window.toggleStudentSet=function(id,index,checked){
   const draft=db.drafts[id],r=draft?.records?.[index],w=db.workouts.find(x=>x.id===id),item=w?.items?.[r?.item];
-  if(checked&&item?.sideMode==='separate'&&(!String(r.left||'').trim()||!String(r.right||'').trim())){const box=document.getElementById('ep-done-'+index);if(box)box.checked=false;return toast('Registre os dois lados antes de concluir a série.');}
+  if(checked&&(!item.executionMode||item.executionMode==='reps')&&item?.sideMode==='separate'&&(!String(r.left||'').trim()||!String(r.right||'').trim())){const box=document.getElementById('ep-done-'+index);if(box)box.checked=false;return toast('Registre os dois lados antes de concluir a série.');}
   let blockStart=r?.item??-1,blockEnd=blockStart,linked=!!item?.supersetNext||!!w?.items?.[r?.item-1]?.supersetNext;
   if(linked){while(blockStart>0&&w.items[blockStart-1]?.supersetNext)blockStart--;blockEnd=blockStart;while(w.items[blockEnd]?.supersetNext&&blockEnd<w.items.length-1)blockEnd++;}
   window.__epSuppressRestTimer=checked&&linked;originalToggle(id,index,checked);window.__epSuppressRestTimer=false;
@@ -1261,9 +1270,9 @@ EvoluPrograms.boot();
   const cards=w.items.map((item,itemIndex)=>{
    const ex=exercise(d.substitutions?.[itemIndex]||item.exercise),rows=d.records.map((r,index)=>({r,index})).filter(x=>x.r.item===itemIndex).map(({r,index})=>{
     const mode=item.executionMode||'reps',sides=item.sideMode==='separate',unit=item.unit||'kg total';
-    const repsInput=sides?'<div class="ep-side-inputs"><input type="text" maxlength="16" aria-label="Lado esquerdo, série '+r.set+'" placeholder="Esquerdo" onchange="updateStudentRecord(\''+esc(w.id)+'\','+index+',\'left\',this.value)" value="'+esc(r.left||'')+'"><input type="text" maxlength="16" aria-label="Lado direito, série '+r.set+'" placeholder="Direito" onchange="updateStudentRecord(\''+esc(w.id)+'\','+index+',\'right\',this.value)" value="'+esc(r.right||'')+'"></div>':'<input type="text" inputmode="'+(mode==='reps'?'numeric':'text')+'" maxlength="40" aria-label="'+(mode==='timed'?'Tempo realizado':mode==='cardio'?'Distância ou duração do cardio':'Repetições realizadas')+' na série '+r.set+'" placeholder="'+(mode==='timed'?'ex.: 00:40':mode==='cardio'?'ex.: 2 km / 20 min':esc(r.plannedReps||'Reps'))+'" onchange="updateStudentRecord(\''+esc(w.id)+'\','+index+',\'reps\',this.value)" value="'+esc(r.reps)+'">';
+    const repsInput=(window.epExecutionInputs&&epExecutionInputs(w.id,index,r,item))||(sides?'<div class="ep-side-inputs"><input type="text" maxlength="16" aria-label="Lado esquerdo, série '+r.set+'" placeholder="Esquerdo" onchange="updateStudentRecord(\''+esc(w.id)+'\','+index+',\'left\',this.value)" value="'+esc(r.left||'')+'"><input type="text" maxlength="16" aria-label="Lado direito, série '+r.set+'" placeholder="Direito" onchange="updateStudentRecord(\''+esc(w.id)+'\','+index+',\'right\',this.value)" value="'+esc(r.right||'')+'"></div>':'<input type="text" inputmode="'+(mode==='reps'?'numeric':'text')+'" maxlength="40" aria-label="'+(mode==='timed'?'Tempo realizado':mode==='cardio'?'Distância ou duração do cardio':'Repetições realizadas')+' na série '+r.set+'" placeholder="'+(mode==='timed'?'ex.: 00:40':mode==='cardio'?'ex.: 2 km / 20 min':esc(r.plannedReps||'Reps'))+'" onchange="updateStudentRecord(\''+esc(w.id)+'\','+index+',\'reps\',this.value)" value="'+esc(r.reps)+'">');
     const note=r.type==='drop'?'Drop set · '+(r.drops||2)+' quedas de '+(r.dropPercent||25)+'%':r.type==='restpause'?'Rest-pause · '+(r.miniSets||2)+' mini-séries, pausas de '+(r.miniRest||20)+' s':'';
-    return '<div class="ep-set-row"><span>'+r.set+'</span><input type="number" min="0" max="2000" step="0.5" inputmode="decimal" aria-label="Carga da série '+r.set+' em '+esc(unit)+'" onchange="updateStudentRecord(\''+esc(w.id)+'\','+index+',\'load\',this.value)" value="'+esc(r.load)+'">'+repsInput+'<input type="checkbox" id="ep-done-'+index+'" aria-label="Marcar série '+r.set+' concluída" onchange="toggleStudentSet(\''+esc(w.id)+'\','+index+',this.checked)" '+(r.done?'checked':'')+'></div>'+(note?'<div class="ep-tech-note">'+note+' · Anote cada bloco de repetições (ex.: 10 + 4 + 3).</div>':'');
+    return '<div class="ep-set-row"><span>'+r.set+'</span><input type="number" min="0" max="2000" step="0.5" inputmode="decimal" aria-label="Carga da série '+r.set+' em '+esc(unit)+'" onchange="updateStudentRecord(\''+esc(w.id)+'\','+index+',\'load\',this.value)" value="'+esc(r.load)+'">'+repsInput+'<input type="checkbox" id="ep-done-'+index+'" aria-label="Marcar série '+r.set+' concluída" onchange="toggleStudentSet(\''+esc(w.id)+'\','+index+',this.checked)" '+(r.done?'checked':'')+'></div>'+(window.epTechniqueInputs?epTechniqueInputs(w.id,index,r):'');
    }).join('');
    const label=item.executionMode==='timed'?'tempo alvo':item.executionMode==='cardio'?'cardio alvo':'repetições alvo';
    const side=item.sideMode==='separate'?' · cada lado':'';
@@ -1976,7 +1985,7 @@ EvoluPrograms.boot();
   function pwaPanel() {
     const secure = window.isSecureContext, supported = 'serviceWorker' in navigator && secure, standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
     const state = !supported ? 'Use o endereço HTTPS publicado para instalar e habilitar recursos offline.' : standalone ? 'Instalado como aplicativo.' : 'Pronto para instalar pelo navegador.';
-    return '<section class="card section"><div class="eyebrow">ETAPA 10 · INSTALAÇÃO E OFFLINE</div><h2>Aplicativo neste dispositivo</h2><p class="muted" id="epPwaStatus" aria-live="polite">' + state + '</p><div class="row wrap"><button id="epInstallButton" class="primary" onclick="epInstallPWA()" ' + (installPrompt ? '' : 'hidden') + '>Instalar EvoluPersonal</button><button onclick="epCheckPWA()">Verificar instalação</button><button id="epUpdateCheck" onclick="epUpdatePWA()" ' + (supported ? '' : 'disabled') + '>Verificar atualização</button><button id="epUpdateApply" class="primary" onclick="epApplyUpdate()" hidden>Atualizar agora</button></div><p class="muted" id="epUpdateStatus" role="status">Versão instalada · Beta 1.3</p><p class="muted" id="epStorageStatus">Consultando armazenamento deste navegador…</p><div class="notice">Os dados de alunos permanecem neste dispositivo. Exporte um backup JSON regularmente; instalar o PWA não transfere dados para outro aparelho.</div></section>';
+    return '<section class="card section"><div class="eyebrow">ETAPA 10 · INSTALAÇÃO E OFFLINE</div><h2>Aplicativo neste dispositivo</h2><p class="muted" id="epPwaStatus" aria-live="polite">' + state + '</p><div class="row wrap"><button id="epInstallButton" class="primary" onclick="epInstallPWA()" ' + (installPrompt ? '' : 'hidden') + '>Instalar EvoluPersonal</button><button onclick="epCheckPWA()">Verificar instalação</button><button id="epUpdateCheck" onclick="epUpdatePWA()" ' + (supported ? '' : 'disabled') + '>Verificar atualização</button><button id="epUpdateApply" class="primary" onclick="epApplyUpdate()" hidden>Atualizar agora</button></div><p class="muted" id="epUpdateStatus" role="status">Versão instalada · Beta 1.4</p><p class="muted" id="epStorageStatus">Consultando armazenamento deste navegador…</p><div class="notice">Os dados de alunos permanecem neste dispositivo. Exporte um backup JSON regularmente; instalar o PWA não transfere dados para outro aparelho.</div></section>';
   }
   window.epInstallPWA = async function () {
     if (!installPrompt) return toast('No celular, abra o menu do navegador e escolha “Instalar aplicativo” ou “Adicionar à tela inicial”.');
@@ -2101,5 +2110,6 @@ EvoluPrograms.boot();
 })();
 
 </script>
+<script src="./execution.js"></script>
 </body></html>
 

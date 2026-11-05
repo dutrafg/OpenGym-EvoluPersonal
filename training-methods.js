@@ -24,7 +24,7 @@ function validDB(d){try{
     if(!Array.isArray(i.setPlan)||i.setPlan.length<1||i.setPlan.length>30||i.sets!==i.setPlan.filter(isWork).length||i.sets<1||i.sets>20)return false;
     if(!i.setPlan.every((s,k)=>s&&Object.hasOwn(SERIES_TYPES,s.type)&&['fixed','percent'].includes(s.mode)&&validLoad(s.load)&&typeof s.reps==='string'&&s.reps.trim()&&s.reps.length<=40&&Number.isInteger(s.rest)&&s.rest>=0&&s.rest<=3600&&(s.rir===null||Number.isInteger(s.rir)&&s.rir>=0&&s.rir<=10)&&Number.isFinite(s.percent)&&s.percent>0&&s.percent<=100&&(s.reference==='base'||Number.isInteger(s.reference)&&s.reference>=0&&s.reference<k&&isWork(i.setPlan[s.reference]))&&(s.type!=='backoff'||s.mode==='percent'&&Number.isInteger(s.reference))))return false;
    }
-   if(i.progression!==undefined){const p=i.progression;if(!p||(p.scheme!==undefined&&!['linear','double'].includes(p.scheme))||(p.deloadAfter!==undefined&&(!Number.isInteger(p.deloadAfter)||p.deloadAfter<2||p.deloadAfter>6))||(p.deloadPercent!==undefined&&(!Number.isFinite(p.deloadPercent)||p.deloadPercent<5||p.deloadPercent>30))||!['off','all','principal'].includes(p.criterion)||!Number.isInteger(p.min)||!Number.isInteger(p.max)||p.min<1||p.max<p.min||p.max>100||!Number.isFinite(p.increment)||p.increment<=0||p.increment>100)return false;}
+   if(i.progression!==undefined){const p=i.progression;if(i.executionMode&&i.executionMode!=='reps'||!p||(p.scheme!==undefined&&!['linear','double'].includes(p.scheme))||(p.deloadAfter!==undefined&&(!Number.isInteger(p.deloadAfter)||p.deloadAfter<2||p.deloadAfter>6))||(p.deloadPercent!==undefined&&(!Number.isFinite(p.deloadPercent)||p.deloadPercent<5||p.deloadPercent>30))||!['off','all','principal'].includes(p.criterion)||!Number.isInteger(p.min)||!Number.isInteger(p.max)||p.min<1||p.max<p.min||p.max>100||!Number.isFinite(p.increment)||p.increment<=0||p.increment>100)return false;}
    const pi=projected.workouts[wi].items[n];pi.sets=planFor(i).length;pi.load=i.load===null?0:i.load;
   }
  }
@@ -123,7 +123,7 @@ function applyPreviousLoad(workoutId,rowIndex,load){
 }
 function estimated1RMForRecord(record){
  const load=record&&record.load,reps=record&&record.reps;
- if(!record||record.done!==true||!Number.isFinite(load)||load<=0||typeof reps!=='string'||!/^\s*\d{1,2}\s*$/.test(reps))return null;
+ if(!record||record.executionMode&&record.executionMode!=='reps'||['aquecimento','feeder','drop','restpause'].includes(record.type)||record.done!==true||!Number.isFinite(load)||load<=0||typeof reps!=='string'||!/^\s*\d{1,2}\s*$/.test(reps))return null;
  const count=Number(reps.trim());if(count<1||count>12)return null;
  return Math.round(load*(1+count/30)*10)/10;
 }
@@ -154,12 +154,13 @@ function recordChange(id,k,field,el){const w=db.workouts.find(w=>w.id===id),d=db
  save();render();
 }
 function progressionSuggestions(w,records){return w.items.flatMap((i,n)=>{
- const p=i.progression;if(!p||p.criterion==='off')return[];const rows=records.filter(r=>r.item===n&&isWork({type:r.type||'trabalho'})&&(p.criterion!=='principal'||r.type==='principal'));
+ const p=i.progression;if(i.executionMode&&i.executionMode!=='reps'||!p||p.criterion==='off')return[];const rows=records.filter(r=>r.item===n&&isWork({type:r.type||'trabalho'})&&(p.criterion!=='principal'||r.type==='principal'));
  if(!rows.length||rows.some(r=>r.exercise!==i.exercise))return[];const eligible=rows.every(r=>r.done&&/^\d+$/.test(r.reps)&&Number(r.reps)>=p.max&&r.load!==null&&(!Number.isFinite(r.targetRir)||r.rir!==null&&r.rir!==undefined&&r.rir>=r.targetRir));
  if(!eligible)return[];return[exercise(i.exercise)?.name+': revisar aumento de '+p.increment+' '+(i.unit||'kg total')+'; critério '+(p.criterion==='all'?'todas as séries':'série principal')+' atingido.'];
  });}
 
 function doubleProgressionStatus(item,rows){
+ if(item.executionMode&&item.executionMode!=='reps')return null;
  const p=item.progression;
  if(!p||p.scheme!=='double'||p.criterion==='off')return null;
  const selected=rows.filter(r=>isWork({type:r.type||'trabalho'})&&(p.criterion!=='principal'||r.type==='principal'));
